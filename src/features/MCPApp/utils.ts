@@ -69,20 +69,17 @@ export const buildAppCsp = (csp: McpUiResourceCsp | undefined): string => {
 const escapeAttribute = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 
 /**
- * Prepend the CSP `<meta>` so it is the first thing the parser sees; a policy
- * declared after a script would not apply to that script.
+ * Put the CSP `<meta>` ahead of every byte the app controls; a policy declared
+ * after a script would not apply to that script. Searching the app's markup for
+ * its `<head>` is not safe: a `<head>` inside a comment, or a script before the
+ * real head, would run unrestricted.
+ *
+ * The parser places the leading `<meta>` in the implied `<head>`, where the
+ * policy applies, and merges the app's own `<html>`/`<head>` into those
+ * elements. Its doctype would then be ignored, so ours keeps standards mode.
  */
-export const injectCsp = (html: string, csp: string): string => {
-  const tag = `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}">`;
-
-  const head = /<head[^>]*>/i.exec(html);
-  if (head)
-    return (
-      html.slice(0, head.index + head[0].length) + tag + html.slice(head.index + head[0].length)
-    );
-
-  return tag + html;
-};
+export const injectCsp = (html: string, csp: string): string =>
+  `<!doctype html><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}">${html}`;
 
 /** Map LobeHub's tool call envelope back to the MCP `CallToolResult` a view expects. */
 export const toCallToolResult = (

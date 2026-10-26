@@ -53,17 +53,29 @@ describe('buildAppCsp', () => {
 });
 
 describe('injectCsp', () => {
-  it('puts the policy first inside <head>', () => {
-    const html = injectCsp('<html><head><script>1</script></head></html>', "default-src 'none'");
+  const policy = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'">`;
 
-    expect(html).toBe(
-      `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'"><script>1</script></head></html>`,
-    );
+  it('puts the policy ahead of the whole document, which stays as written', () => {
+    const app = '<!doctype html><html lang="en"><head><script>1</script></head></html>';
+
+    expect(injectCsp(app, "default-src 'none'")).toBe(policy + app);
   });
 
-  it('prepends the policy to fragments without <head>', () => {
-    expect(injectCsp('<div></div>', 'a')).toBe(
-      '<meta http-equiv="Content-Security-Policy" content="a"><div></div>',
+  it('is not fooled by a <head> inside a comment', () => {
+    const app = '<!-- <head> --><script>fetch("https://x")</script><head></head>';
+
+    expect(injectCsp(app, "default-src 'none'")).toBe(policy + app);
+  });
+
+  it('covers a script placed before the real <head>', () => {
+    const app = '<script>fetch("https://x")</script><html><head></head></html>';
+
+    expect(injectCsp(app, "default-src 'none'")).toBe(policy + app);
+  });
+
+  it('escapes the policy into its attribute', () => {
+    expect(injectCsp('<div></div>', `a"&`)).toBe(
+      '<!doctype html><meta http-equiv="Content-Security-Policy" content="a&quot;&amp;"><div></div>',
     );
   });
 });

@@ -6,12 +6,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useChatInputResourceAccess } from '@/features/ChatInput/hooks/useChatInputResourceAccess';
-import { useDeviceList } from '@/features/DeviceManager/useDeviceList';
 import { ExecutionTargetDeviceStatus, ExecutionTargetIcon } from '@/features/ExecutionTargetPicker';
 import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useDeviceList } from '@/store/device';
 import { type ProjectDirectory } from '@/store/projectWorkingDirectory';
 
+import DeviceDetailPopover from './DeviceDetailPopover';
 import OptionRow from './OptionRow';
 import {
   listProjectDeviceTargets,
@@ -101,7 +102,7 @@ const ProjectDeviceSwitcher = ({
       <div className={styles.title}>{t('heteroAgent.executionTarget.title')}</div>
       {targets.map((target) => {
         const selectable = target.online && target.allowed;
-        return (
+        const row = (
           <OptionRow
             active={target.active}
             disabled={!selectable}
@@ -117,6 +118,8 @@ const ProjectDeviceSwitcher = ({
                       offlineLabel={t('heteroAgent.executionTarget.offline')}
                       online={target.online}
                       onlineLabel={t('heteroAgent.executionTarget.online')}
+                      unknown={target.onlineUnknown}
+                      unknownLabel={t('heteroAgent.executionTarget.presenceChecking')}
                     />
                   </span>
                 </>
@@ -129,6 +132,15 @@ const ProjectDeviceSwitcher = ({
             }
             onClick={() => (selectable ? handleSelect(target) : undefined)}
           />
+        );
+        // Same hover details as the regular device picker: the label alone
+        // can't tell two machines' specs or last-seen time apart.
+        return target.device ? (
+          <DeviceDetailPopover device={target.device} key={target.directory.id}>
+            <div>{row}</div>
+          </DeviceDetailPopover>
+        ) : (
+          row
         );
       })}
       <div className={styles.hint}>{t('heteroAgent.executionTarget.projectDevicesHint')}</div>

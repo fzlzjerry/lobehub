@@ -2,7 +2,7 @@ import type { AssistantGroupSegment } from '@lobechat/conversation-flow';
 
 import { LOADING_FLAT } from '@/const/message';
 
-import { isImageOutputTool } from '../toolRenderRules';
+import { isDeliverableTool } from '../toolRenderRules';
 import type { RenderableAssistantContentBlock } from './types';
 import type { WorkflowExpandLevel, WorkflowExpandLevelDefault } from './WorkflowCollapse';
 
@@ -47,10 +47,10 @@ export const hasRenderableFinalAnswer = (segments: GroupRenderSegment[]): boolea
  * answer is visible, so a tool-only latest turn does not collapse into a lone
  * header.
  *
- * A turn whose process carries a PRODUCED image never folds — that image is the
- * deliverable. A tool that merely READ an image no longer blocks folding: the
- * read is one ordinary step, and it surfaces (with its preview) once the fold is
- * expanded instead of holding the whole process open.
+ * A turn whose process carries a PRODUCED image or an MCP App view never folds —
+ * that output is the deliverable. A tool that merely READ an image no longer
+ * blocks folding: the read is one ordinary step, and it surfaces (with its
+ * preview) once the fold is expanded instead of holding the whole process open.
  */
 export const shouldFoldProcess = ({
   enabled,
@@ -74,7 +74,7 @@ export const shouldFoldProcess = ({
   processSegments.some((segment) => segment.kind === 'workflow') &&
   !processSegments.some((segment) =>
     (segment.kind === 'answer' ? [segment.block] : segment.blocks).some((block) =>
-      block.tools?.some(isImageOutputTool),
+      block.tools?.some(isDeliverableTool),
     ),
   );
 

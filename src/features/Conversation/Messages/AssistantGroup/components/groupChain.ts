@@ -8,7 +8,7 @@ import { LOADING_FLAT } from '@/const/message';
 import type { AssistantContentBlock } from '@/types/index';
 
 import { areWorkflowToolsComplete } from '../toolDisplayNames';
-import { isImageBearingTool } from '../toolRenderRules';
+import { isBreakoutTool } from '../toolRenderRules';
 import type { GroupRenderSegment } from './segments';
 import type { RenderableAssistantContentBlock } from './types';
 
@@ -248,7 +248,7 @@ export const buildChainView = (
 ): GroupChainView => {
   const { isGenerating } = state;
   const partitioned = partitionAssistantGroupBlocks(chain.blocks, {
-    isBreakoutTool: isImageBearingTool,
+    isBreakoutTool,
     isGenerating,
     toolsPhaseComplete: isGenerating
       ? areWorkflowToolsComplete(chain.blocks.flatMap((block) => block.tools ?? []))

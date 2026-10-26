@@ -185,6 +185,29 @@ describe('shouldFoldProcess', () => {
     ).toBe(false);
   });
 
+  it('keeps a finished turn with an MCP App view unfolded', () => {
+    const appTool = {
+      apiName: 'get_weather',
+      id: 'app',
+      identifier: 'weather-demo',
+      result: {
+        content: 'ok',
+        id: 'r',
+        state: { content: [], mcpApp: { resourceUri: 'ui://weather/view' } },
+      },
+    };
+    expect(
+      shouldFoldProcess({
+        enabled: true,
+        hasFinalAnswer: true,
+        isGenerating: false,
+        isLatestItem: true,
+        operationEnded: true,
+        processSegments: [{ blocks: [{ id: 'app', tools: [appTool] } as any], kind: 'workflow' }],
+      }),
+    ).toBe(false);
+  });
+
   it('does not fold when the process has no workflow (e.g. pure prose)', () => {
     expect(
       shouldFoldProcess({

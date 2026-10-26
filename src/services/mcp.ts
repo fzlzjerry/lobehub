@@ -302,10 +302,18 @@ class MCPService {
   ): Promise<ReadResourceResult | undefined> {
     const { pluginSelectors } = await import('@/store/tool/selectors');
     const { getToolStoreState } = await import('@/store/tool/store');
-    const s = getToolStoreState();
+    let s = getToolStoreState();
 
     const { connectorSelectors } = await import('@/store/tool/slices/connector/selectors');
     const connector = connectorSelectors.connectorByIdentifierForAgent(identifier, agentId)(s);
+
+    // A conversation opened cold has not loaded the installed plugins yet, and an
+    // unloaded list would send a plugin's view to the connector route. Load the
+    // server's records first, as the tool call did before it ran.
+    if (!connector && !pluginSelectors.isInstalledPluginsServerConfirmed(s)) {
+      await s.refreshPlugins();
+      s = getToolStoreState();
+    }
 
     // Stdio connectors run on a desktop app, never on the server, so only the
     // desktop can read their view: it spawns the same command over IPC.

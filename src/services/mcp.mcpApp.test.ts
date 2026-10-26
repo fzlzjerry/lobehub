@@ -14,6 +14,7 @@ const {
   relayCall,
   relayRead,
   plugins,
+  toolState,
 } = vi.hoisted(() => ({
   connectorCall: vi.fn(),
   connectorEdit: vi.fn(),
@@ -25,6 +26,13 @@ const {
   plugins: new Map<string, unknown>(),
   relayCall: vi.fn(),
   relayRead: vi.fn(),
+  // The tool store as the service reads it: plugins are visible once loaded.
+  toolState: {
+    pluginsLoaded: true,
+    refreshPlugins: vi.fn(async () => {
+      toolState.pluginsLoaded = true;
+    }),
+  },
 }));
 
 vi.mock('@lobechat/const', async (importOriginal) => ({
@@ -57,12 +65,14 @@ vi.mock('./discover', () => ({
   },
 }));
 
-vi.mock('@/store/tool/store', () => ({ getToolStoreState: () => ({}) }));
+vi.mock('@/store/tool/store', () => ({ getToolStoreState: () => toolState }));
 
 vi.mock('@/store/tool/selectors', () => ({
   pluginSelectors: {
     getCustomPluginById: () => () => undefined,
-    getInstalledPluginById: (id: string) => () => plugins.get(id),
+    getInstalledPluginById: (id: string) => () =>
+      toolState.pluginsLoaded ? plugins.get(id) : undefined,
+    isInstalledPluginsServerConfirmed: () => toolState.pluginsLoaded,
   },
 }));
 
@@ -73,9 +83,10 @@ vi.mock('@/store/tool/slices/connector/selectors', () => ({
   },
 }));
 
-// Each case runs on the desktop unless it says otherwise
+// Each case runs on the desktop, with the plugins loaded, unless it says otherwise
 beforeEach(() => {
   environment.isDesktop = true;
+  toolState.pluginsLoaded = true;
 });
 
 const view = { contents: [{ text: '<html />', uri: 'ui://app' }] };
@@ -106,6 +117,19 @@ describe('mcpService.readMcpAppResource on desktop', () => {
       },
       uri: 'ui://app',
     });
+  });
+
+  it('loads the installed plugins first when the conversation was opened cold', async () => {
+    plugins.set('remote', httpPlugin('https://mcp.example.com/mcp'));
+    toolState.pluginsLoaded = false;
+
+    await expect(mcpService.readMcpAppResource('remote', 'ui://app', 'agt_1')).resolves.toEqual(
+      view,
+    );
+
+    expect(toolState.refreshPlugins).toHaveBeenCalledTimes(1);
+    expect(connectorRead).not.toHaveBeenCalled();
+    expect(relayRead).toHaveBeenCalledWith(expect.objectContaining({ uri: 'ui://app' }));
   });
 
   it('keeps public http servers on the server relay', async () => {

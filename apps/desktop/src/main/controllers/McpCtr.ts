@@ -620,10 +620,10 @@ export default class McpCtr extends ControllerModule {
   @IpcMethod()
   async callTool(payload: SuperJSONSerialized<CallToolInput>) {
     const input = deserializePayload<CallToolInput>(payload);
-    if (input.http) {
+    if ('http' in input && input.http) {
       return serializePayload(await this.runHttpMcpTool(input.http, input.toolName, input.args));
     }
-    return serializePayload(await this.runStdioMcpTool(input));
+    return serializePayload(await this.runStdioMcpTool(input as StdioCallToolInput));
   }
 
   /**

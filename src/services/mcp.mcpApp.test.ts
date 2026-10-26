@@ -32,7 +32,8 @@ vi.mock('@/libs/trpc/client', () => ({
   lambdaClient: {
     connector: { callTool: { mutate: connectorCall }, readUiResource: { query: connectorRead } },
   },
-  toolsClient: { mcp: { callTool: { mutate: relayCall }, readUiResource: { query: relayRead } } },
+  // The relay read is a mutation only: plugin credentials must never go out in a GET URL
+  toolsClient: { mcp: { callTool: { mutate: relayCall }, readUiResource: { mutate: relayRead } } },
 }));
 
 vi.mock('@/utils/electron/ipc', () => ({
@@ -98,7 +99,10 @@ describe('mcpService.readMcpAppResource on desktop', () => {
     await expect(mcpService.readMcpAppResource('remote', 'ui://app')).resolves.toEqual(view);
 
     expect(ipcRead).not.toHaveBeenCalled();
-    expect(relayRead).toHaveBeenCalledWith(expect.objectContaining({ uri: 'ui://app' }));
+    expect(relayRead).toHaveBeenCalledWith({
+      params: expect.objectContaining({ headers: { 'x-key': 'k' } }),
+      uri: 'ui://app',
+    });
   });
 });
 

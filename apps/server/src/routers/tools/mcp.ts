@@ -109,11 +109,12 @@ export const mcpRouter = router({
 
   /**
    * Read an MCP Apps `ui://` resource so the chat can render a tool result's
-   * interactive view.
+   * interactive view. A mutation, though it only reads: the params carry the
+   * plugin's auth and headers, which must travel in a POST body, not a GET URL.
    */
   readUiResource: mcpProcedure
     .input(z.object({ params: mcpClientParamsSchema, uri: z.string().startsWith('ui://') }))
-    .query(async ({ input }) => {
+    .mutation(async ({ input }) => {
       checkStdioEnvironment(input.params);
 
       return await mcpService.readUiResource(input.params, input.uri);

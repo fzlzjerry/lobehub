@@ -352,7 +352,8 @@ class MCPService {
       return deserializeMcpIpcPayload(result) as ReadResourceResult;
     }
 
-    return (await toolsClient.mcp.readUiResource.query({ params, uri })) as ReadResourceResult;
+    // POST: the params carry the plugin's auth and headers
+    return (await toolsClient.mcp.readUiResource.mutate({ params, uri })) as ReadResourceResult;
   }
 
   async getStreamableMcpServerManifest(

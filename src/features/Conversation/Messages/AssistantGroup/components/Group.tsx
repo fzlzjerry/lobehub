@@ -173,13 +173,20 @@ const Group = memo<GroupChildrenProps>(
     const renderChain = (
       view: GroupChainView,
       segments: GroupRenderSegment[],
-      variant: 'process' | 'lifted' | 'final',
+      variant: 'process' | 'folded' | 'final',
     ) => (
       <MessageAggregationContext
         key={`${view.id}.${variant}`}
         value={contextValues[views.indexOf(view)]!}
       >
-        {segments.map((segment) => renderChainSegment(view, segment, renderOptions))}
+        {/* Keyed by the segment's place in the whole turn, not in this slice:
+            folding changes the slice, and a positional key would remount a
+            segment that stays on screen. */}
+        {segments.map((segment) => (
+          <Fragment key={view.segments.indexOf(segment)}>
+            {renderChainSegment(view, segment, renderOptions)}
+          </Fragment>
+        ))}
       </MessageAggregationContext>
     );
 
@@ -195,7 +202,9 @@ const Group = memo<GroupChildrenProps>(
     // finished, so that turn's answer is a real reply, not process. Each steer
     // bubble sits after the answer of the turn it followed. A turn that stopped
     // on a tool call has no final answer and folds whole. MCP App views are
-    // lifted out of the fold and sit between it and the answer.
+    // lifted out of the fold and sit between it and the answer. They stay in
+    // the `process` chain in both states, so folding does not remount (and
+    // reload) a view the user may already be using.
     const splits = views.map((view) => {
       const split = splitAssistantGroupFinalAnswer(view.segments);
       const { folded, lifted } = liftMcpAppSegments(split.processSegments);
@@ -220,7 +229,7 @@ const Group = memo<GroupChildrenProps>(
       if (segments.length === 0) return null;
       // Only intermediate prose is left once the views are lifted: nothing to fold.
       if (!segments.some((segment) => segment.kind === 'workflow'))
-        return renderChain(view, segments, 'process');
+        return renderChain(view, segments, 'folded');
       const durationMs = chainDurations[index] ?? 0;
       return (
         <ProcessFold
@@ -228,7 +237,7 @@ const Group = memo<GroupChildrenProps>(
           key={view.id}
           stepCount={countAssistantLlmCalls(view.segments)}
         >
-          <Flexbox gap={8}>{renderChain(view, segments, 'process')}</Flexbox>
+          <Flexbox gap={8}>{renderChain(view, segments, 'folded')}</Flexbox>
         </ProcessFold>
       );
     };
@@ -238,16 +247,13 @@ const Group = memo<GroupChildrenProps>(
         {views.map((view, index) => (
           <Fragment key={view.id}>
             {view.steerUserId && <SteerMessage id={view.steerUserId} />}
-            {foldProcess ? (
-              <>
-                {renderFold(view, index)}
-                {splits[index]!.liftedSegments.length > 0 &&
-                  renderChain(view, splits[index]!.liftedSegments, 'lifted')}
-                {renderChain(view, splits[index]!.finalSegments, 'final')}
-              </>
-            ) : (
-              renderChain(view, view.segments, 'process')
+            {foldProcess && renderFold(view, index)}
+            {renderChain(
+              view,
+              foldProcess ? splits[index]!.liftedSegments : view.segments,
+              'process',
             )}
+            {foldProcess && renderChain(view, splits[index]!.finalSegments, 'final')}
           </Fragment>
         ))}
         {!foldProcess && lastView.showTailRunningIndicator && (

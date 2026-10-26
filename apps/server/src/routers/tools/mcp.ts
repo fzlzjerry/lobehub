@@ -115,8 +115,6 @@ export const mcpRouter = router({
   readUiResource: mcpProcedure
     .input(z.object({ params: mcpClientParamsSchema, uri: z.string().startsWith('ui://') }))
     .mutation(async ({ input }) => {
-      checkStdioEnvironment(input.params);
-
       return await mcpService.readUiResource(input.params, input.uri);
     }),
 

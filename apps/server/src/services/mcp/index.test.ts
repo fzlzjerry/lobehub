@@ -224,6 +224,7 @@ describe('MCPService log redaction', () => {
       callTool: vi.fn().mockResolvedValue({
         content: [{ text: 'tool-result-secret', type: 'text' }],
       }),
+      getToolUiResourceUri: vi.fn().mockResolvedValue(undefined),
     };
     vi.spyOn(service as any, 'getClient').mockResolvedValue(mockClient);
 

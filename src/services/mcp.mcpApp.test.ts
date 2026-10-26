@@ -5,8 +5,10 @@ import { mcpService } from './mcp';
 
 const {
   connectorCall,
+  connectorEdit,
   connectorRead,
   connectors,
+  environment,
   ipcCall,
   ipcRead,
   relayCall,
@@ -14,8 +16,10 @@ const {
   plugins,
 } = vi.hoisted(() => ({
   connectorCall: vi.fn(),
+  connectorEdit: vi.fn(),
   connectorRead: vi.fn(),
   connectors: new Map<string, unknown>(),
+  environment: { isDesktop: true },
   ipcCall: vi.fn(),
   ipcRead: vi.fn(),
   plugins: new Map<string, unknown>(),
@@ -25,12 +29,18 @@ const {
 
 vi.mock('@lobechat/const', async (importOriginal) => ({
   ...((await importOriginal()) as Record<string, unknown>),
-  isDesktop: true,
+  get isDesktop() {
+    return environment.isDesktop;
+  },
 }));
 
 vi.mock('@/libs/trpc/client', () => ({
   lambdaClient: {
-    connector: { callTool: { mutate: connectorCall }, readUiResource: { query: connectorRead } },
+    connector: {
+      callTool: { mutate: connectorCall },
+      getForEdit: { query: connectorEdit },
+      readUiResource: { query: connectorRead },
+    },
   },
   // The relay read is a mutation only: plugin credentials must never go out in a GET URL
   toolsClient: { mcp: { callTool: { mutate: relayCall }, readUiResource: { mutate: relayRead } } },
@@ -56,12 +66,17 @@ vi.mock('@/store/tool/selectors', () => ({
   },
 }));
 
-vi.mock('@/store/tool/slices/connector', () => ({
+vi.mock('@/store/tool/slices/connector/selectors', () => ({
   connectorSelectors: {
     connectorByIdentifierForAgent: (id: string, agentId?: string) => () =>
       connectors.get(`${agentId}:${id}`),
   },
 }));
+
+// Each case runs on the desktop unless it says otherwise
+beforeEach(() => {
+  environment.isDesktop = true;
+});
 
 const view = { contents: [{ text: '<html />', uri: 'ui://app' }] };
 const httpPlugin = (url: string) => ({
@@ -103,6 +118,62 @@ describe('mcpService.readMcpAppResource on desktop', () => {
       params: expect.objectContaining({ headers: { 'x-key': 'k' } }),
       uri: 'ui://app',
     });
+  });
+});
+
+describe('mcpService.readMcpAppResource for stdio connectors', () => {
+  const stdioConnector = {
+    id: 'conn_1',
+    identifier: 'files',
+    isEnabled: true,
+    mcpConnectionType: 'stdio',
+  };
+  const detail = {
+    ...stdioConnector,
+    mcpStdioConfig: { args: ['mcp.js'], command: 'node', env: { TOKEN: 'fresh-secret' } },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    plugins.clear();
+    connectors.clear();
+    connectors.set('undefined:files', stdioConnector);
+    connectorEdit.mockResolvedValue(detail);
+    ipcRead.mockResolvedValue(serializeMcpIpcPayload(view));
+  });
+
+  it('reads the view on the desktop with the fresh stdio configuration', async () => {
+    await expect(mcpService.readMcpAppResource('files', 'ui://app')).resolves.toEqual(view);
+
+    expect(connectorEdit).toHaveBeenCalledWith({ id: 'conn_1' });
+    expect(deserializeMcpIpcPayload(ipcRead.mock.calls[0][0])).toEqual({
+      env: { TOKEN: 'fresh-secret' },
+      params: { args: ['mcp.js'], command: 'node', name: 'files', type: 'stdio' },
+      uri: 'ui://app',
+    });
+    expect(connectorRead).not.toHaveBeenCalled();
+  });
+
+  it('does not read once the connector is disabled or loses its command', async () => {
+    for (const current of [
+      { ...detail, isEnabled: false },
+      { ...detail, mcpStdioConfig: undefined },
+    ]) {
+      connectorEdit.mockResolvedValueOnce(current);
+
+      await expect(mcpService.readMcpAppResource('files', 'ui://app')).resolves.toBeUndefined();
+    }
+    expect(ipcRead).not.toHaveBeenCalled();
+  });
+
+  it('falls back without a request off the desktop, where nothing can run the command', async () => {
+    environment.isDesktop = false;
+
+    await expect(mcpService.readMcpAppResource('files', 'ui://app')).resolves.toBeUndefined();
+
+    expect(connectorEdit).not.toHaveBeenCalled();
+    expect(connectorRead).not.toHaveBeenCalled();
+    expect(ipcRead).not.toHaveBeenCalled();
   });
 });
 

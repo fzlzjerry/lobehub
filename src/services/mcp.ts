@@ -304,8 +304,36 @@ class MCPService {
     const { getToolStoreState } = await import('@/store/tool/store');
     const s = getToolStoreState();
 
-    const { connectorSelectors } = await import('@/store/tool/slices/connector');
+    const { connectorSelectors } = await import('@/store/tool/slices/connector/selectors');
     const connector = connectorSelectors.connectorByIdentifierForAgent(identifier, agentId)(s);
+
+    // Stdio connectors run on a desktop app, never on the server, so only the
+    // desktop can read their view: it spawns the same command over IPC.
+    if (connector?.isEnabled && connector.mcpConnectionType === 'stdio') {
+      if (!isDesktop) return;
+
+      const { lambdaClient } = await import('@/libs/trpc/client');
+      // Persisted connector projections omit env secrets and may be stale.
+      // This protected read retains the connector's credential ownership gate.
+      const detail = await lambdaClient.connector.getForEdit.query({ id: connector.id });
+      const config = detail.mcpStdioConfig;
+      if (!detail.isEnabled || detail.mcpConnectionType !== 'stdio' || !config?.command) return;
+
+      const result = await ensureElectronIpc().mcp.readUiResource(
+        serializeMcpIpcPayload({
+          env: config.env,
+          params: {
+            args: config.args ?? [],
+            command: config.command,
+            name: detail.identifier,
+            type: 'stdio',
+          },
+          uri,
+        }) as any,
+      );
+      return deserializeMcpIpcPayload(result) as ReadResourceResult;
+    }
+
     const plugin =
       pluginSelectors.getInstalledPluginById(identifier)(s) ||
       pluginSelectors.getCustomPluginById(identifier)(s);

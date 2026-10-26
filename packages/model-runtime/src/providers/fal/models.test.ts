@@ -18,6 +18,11 @@ let instance: LobeFalAI;
 beforeEach(() => {
   vi.clearAllMocks();
   clearFalInputSchemaCache();
+  // No test reaches fal's real catalog API; tests that need a schema stub their own
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}', { status: 500 })),
+  );
   instance = new LobeFalAI({ apiKey: 'test-api-key' });
   mockFal.subscribe.mockResolvedValue({
     data: { images: [{ url: 'https://example.com/out.png' }] },
@@ -281,7 +286,10 @@ describe('LobeFalAI models', () => {
           // The second page keeps failing: the first page must survive
           return new Response('{}', { status: 500 });
         }
-        if (category === 'text-to-video' && calls.filter((c) => c.startsWith('text-to-video')).length === 1) {
+        if (
+          category === 'text-to-video' &&
+          calls.filter((c) => c.startsWith('text-to-video')).length === 1
+        ) {
           return new Response('{}', { headers: { 'retry-after': '0' }, status: 429 });
         }
         return new Response(

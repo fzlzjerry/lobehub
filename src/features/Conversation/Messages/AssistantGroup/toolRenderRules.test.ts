@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isBreakoutTool,
-  isDeliverableTool,
   isImageBearingTool,
   isImageOutputTool,
   isMcpAppTool,
@@ -146,10 +145,8 @@ describe('isMcpAppTool', () => {
     expect(isMcpAppTool(mcp({ content: [], mcpApp: { resourceUri: 'https://x' } }))).toBe(false);
   });
 
-  it('counts as a deliverable and breaks out of collapsed workflow runs', () => {
-    expect(isDeliverableTool(mcp(view))).toBe(true);
+  it('breaks out of collapsed workflow runs', () => {
     expect(isBreakoutTool(mcp(view))).toBe(true);
-    expect(isDeliverableTool(mcp({ content: [] }))).toBe(false);
     expect(isBreakoutTool(mcp({ content: [] }))).toBe(false);
   });
 });

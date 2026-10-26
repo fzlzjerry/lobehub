@@ -857,6 +857,7 @@
   "list.item.local.title": "自定义",
   "loading.content": "调用技能中…",
   "loading.plugin": "技能运行中…",
+  "mcpApp.message.source": "从 {{app}} 的页面发送",
   "mcpApp.toolCall.confirm.cancel": "拒绝",
   "mcpApp.toolCall.confirm.content": "{{app}} 的页面想要运行工具「{{tool}}」。这个工具需要你确认后才能运行。",
   "mcpApp.toolCall.confirm.ok": "允许",

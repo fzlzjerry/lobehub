@@ -1,16 +1,10 @@
 'use client';
 
 import { safeParseJSON } from '@lobechat/utils';
-import {
-  Button,
-  createModal,
-  createStaticStyles,
-  cssVar,
-  cx,
-  Flexbox,
-  Skeleton,
-} from '@lobehub/ui';
+import { Button, createModal, Flexbox, Skeleton } from '@lobehub/ui';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 import { type AppBridge, buildAllowAttribute } from '@modelcontextprotocol/ext-apps/app-bridge';
+import * as stylex from '@stylexjs/stylex';
 import { useLatest } from 'ahooks';
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,28 +14,34 @@ import { useIsDark } from '@/hooks/useIsDark';
 import { useClientDataSWR } from '@/libs/swr';
 import { mcpAppKeys } from '@/libs/swr/keys';
 import { mcpService } from '@/services/mcp';
+import { sx } from '@/styles/sx';
 
 import { buildHostContext, connectMcpAppBridge } from './bridge';
 import { getAppToolCallPolicy } from './toolCallPolicy';
-import { buildAppCsp, injectCsp, pickAppResource, toCallToolResult } from './utils';
+import { buildAppCsp, injectCsp, pickAppResource, toAppMessage, toCallToolResult } from './utils';
 
 const DEFAULT_HEIGHT = 320;
 const MAX_HEIGHT = 2000;
 
-const styles = createStaticStyles(({ css }) => ({
-  bordered: css`
-    overflow: hidden;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadiusLG};
-    background: ${cssVar.colorBgContainer};
-  `,
-  iframe: css`
-    display: block;
-    width: 100%;
-    border: none;
-    background: transparent;
-  `,
-}));
+const styles = stylex.create({
+  bordered: {
+    overflow: 'hidden',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: cssVar.colorBorderSecondary,
+    borderRadius: cssVar.borderRadiusLG,
+    backgroundColor: cssVar.colorBgContainer,
+    backgroundImage: 'none',
+  },
+  iframe: {
+    display: 'block',
+    width: '100%',
+    borderWidth: '0',
+    borderStyle: 'none',
+    backgroundColor: 'transparent',
+    backgroundImage: 'none',
+  },
+});
 
 export interface McpAppViewProps {
   apiName: string;
@@ -163,7 +163,8 @@ const McpAppView = memo<McpAppViewProps>(
         },
         hostContext: buildHostContext(latest.current.isDark),
         onSizeChange: (nextHeight) => setHeight(Math.min(nextHeight, MAX_HEIGHT)),
-        sendMessage: (text) => latest.current.sendMessage({ message: text }),
+        sendMessage: (text) =>
+          latest.current.sendMessage(toAppMessage(text, latest.current.identifier)),
         toolInput: () => safeParseJSON(latest.current.args || '{}') ?? {},
         toolResult: () => {
           const { result: toolResult } = latest.current;
@@ -190,17 +191,16 @@ const McpAppView = memo<McpAppViewProps>(
     }
 
     return (
-      <div className={cx(resource?.meta?.prefersBorder !== false && styles.bordered)}>
+      <div {...stylex.props(resource?.meta?.prefersBorder !== false && styles.bordered)}>
         <iframe
           allow={buildAllowAttribute(resource?.meta?.permissions)}
-          className={styles.iframe}
           ref={iframeRef}
           // No `allow-same-origin`: the view runs on an opaque origin and can
           // reach LobeHub only through the postMessage bridge.
           sandbox="allow-scripts allow-forms"
           srcDoc={srcDoc}
-          style={{ height }}
           title={`${identifier} / ${apiName}`}
+          {...sx(styles.iframe, undefined, { height })}
         />
       </div>
     );

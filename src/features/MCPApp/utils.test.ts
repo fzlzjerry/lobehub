@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildAppCsp, injectCsp, pickAppResource, toCallToolResult } from './utils';
+import { buildAppCsp, injectCsp, pickAppResource, toAppMessage, toCallToolResult } from './utils';
 
 describe('pickAppResource', () => {
   it('picks the matching text entry with its ui meta', () => {
@@ -77,6 +77,15 @@ describe('injectCsp', () => {
     expect(injectCsp('<div></div>', `a"&`)).toBe(
       '<!doctype html><meta http-equiv="Content-Security-Policy" content="a&quot;&amp;"><div></div>',
     );
+  });
+});
+
+describe('toAppMessage', () => {
+  it('tags the posted message with the view it came from', () => {
+    expect(toAppMessage('What should I wear in Paris?', 'weather-demo')).toEqual({
+      message: 'What should I wear in Paris?',
+      metadata: { mcpAppSource: { identifier: 'weather-demo' } },
+    });
   });
 });
 

@@ -1,3 +1,4 @@
+import type { MessageMetadata } from '@lobechat/types';
 import type {
   McpUiResourceCsp,
   McpUiResourceMeta,
@@ -80,6 +81,18 @@ const escapeAttribute = (value: string) => value.replaceAll('&', '&amp;').replac
  */
 export const injectCsp = (html: string, csp: string): string =>
   `<!doctype html><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}">${html}`;
+
+/**
+ * The message a view posts (`ui/message`), tagged with the view so its bubble
+ * reads as a follow-up from that view rather than something the user typed.
+ */
+export const toAppMessage = (
+  text: string,
+  identifier: string,
+): { message: string; metadata: Pick<MessageMetadata, 'mcpAppSource'> } => ({
+  message: text,
+  metadata: { mcpAppSource: { identifier } },
+});
 
 /** Map LobeHub's tool call envelope back to the MCP `CallToolResult` a view expects. */
 export const toCallToolResult = (

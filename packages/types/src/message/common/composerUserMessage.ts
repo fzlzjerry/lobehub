@@ -5,7 +5,8 @@ import { MessageMetadataSchema } from './metadata';
 
 /**
  * Metadata the composer authors for the user message it sends: content attached
- * from the conversation, a page or code, and local file snapshots.
+ * from the conversation, a page or code, local file snapshots, and the MCP App
+ * view that posted it.
  *
  * Both send transports persist the user message from this one shape —
  * `aiChat.sendMessageInServer` (client / in-process hetero runtimes) and
@@ -20,6 +21,7 @@ import { MessageMetadataSchema } from './metadata';
 export const ComposerUserMessageMetadataSchema = MessageMetadataSchema.pick({
   contextSelections: true,
   localSystemToolSnapshots: true,
+  mcpAppSource: true,
   pageSelections: true,
 });
 

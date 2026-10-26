@@ -876,6 +876,7 @@ export default {
   'list.item.local.title': 'Custom',
   'loading.content': 'Calling Skill…',
   'loading.plugin': 'Skill running…',
+  'mcpApp.message.source': 'Sent from the {{app}} view',
   'mcpApp.toolCall.confirm.cancel': 'Deny',
   'mcpApp.toolCall.confirm.content':
     'The {{app}} view wants to run the tool "{{tool}}". This tool asks for approval before it runs.',

@@ -14,7 +14,6 @@ import { useIsDark } from '@/hooks/useIsDark';
 import { useClientDataSWR } from '@/libs/swr';
 import { mcpAppKeys } from '@/libs/swr/keys';
 import { mcpService } from '@/services/mcp';
-import { sx } from '@/styles/sx';
 
 import { buildHostContext, connectMcpAppBridge } from './bridge';
 import { getAppToolCallPolicy } from './toolCallPolicy';
@@ -41,6 +40,7 @@ const styles = stylex.create({
     backgroundColor: 'transparent',
     backgroundImage: 'none',
   },
+  iframeHeight: (height: string) => ({ height }),
 });
 
 export interface McpAppViewProps {
@@ -200,7 +200,7 @@ const McpAppView = memo<McpAppViewProps>(
           sandbox="allow-scripts allow-forms"
           srcDoc={srcDoc}
           title={`${identifier} / ${apiName}`}
-          {...sx(styles.iframe, undefined, { height })}
+          {...stylex.props(styles.iframe, styles.iframeHeight(`${height}px`))}
         />
       </div>
     );

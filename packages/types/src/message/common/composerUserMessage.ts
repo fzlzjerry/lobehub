@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { MessageMetadata } from './metadata';
+import type { MessageMcpAppSource, MessageMetadata } from './metadata';
 import { MessageMetadataSchema } from './metadata';
 
 /**
@@ -34,6 +34,21 @@ export const ComposerUserMessageSchema = z.object({
 });
 
 export type ComposerUserMessage = z.infer<typeof ComposerUserMessageSchema>;
+
+/**
+ * The MCP App view a merged send came from: only when every merged message was
+ * posted by that same view. One typed message among them means the user wrote
+ * part of the text, so the bubble must not name the view.
+ */
+export const mergeMcpAppSource = (
+  sources: (MessageMcpAppSource | undefined)[],
+): MessageMcpAppSource | undefined => {
+  const [first] = sources;
+
+  return first && sources.every((source) => source?.identifier === first.identifier)
+    ? first
+    : undefined;
+};
 
 /** The keys of {@link ComposerUserMessageMetadataSchema}, for code that walks every field. */
 export const COMPOSER_USER_MESSAGE_METADATA_KEYS = Object.keys(

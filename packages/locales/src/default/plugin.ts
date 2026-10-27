@@ -876,10 +876,15 @@ export default {
   'list.item.local.title': 'Custom',
   'loading.content': 'Calling Skill…',
   'loading.plugin': 'Skill running…',
+  'mcpApp.message.confirm.cancel': 'Cancel',
+  'mcpApp.message.confirm.content':
+    'The {{app}} view wants to send this message to the conversation. Sending it starts a new reply.',
+  'mcpApp.message.confirm.ok': 'Send',
+  'mcpApp.message.confirm.title': 'Send this message from the view?',
   'mcpApp.message.source': 'Follow-up from the {{app}} view',
   'mcpApp.toolCall.confirm.cancel': 'Deny',
   'mcpApp.toolCall.confirm.content':
-    'The {{app}} view wants to run the tool "{{tool}}". This tool asks for approval before it runs.',
+    'The {{app}} view wants to run the tool "{{tool}}" with these arguments. Your approval settings ask before it runs.',
   'mcpApp.toolCall.confirm.ok': 'Allow',
   'mcpApp.toolCall.confirm.title': 'Allow this tool to run?',
   'mcpApp.toolCall.rejected':

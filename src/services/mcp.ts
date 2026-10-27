@@ -82,11 +82,18 @@ class MCPService {
     payload: ChatToolPayload,
     {
       agentId,
+      localHttpOverIpc,
       signal,
       topicId,
     }: {
       /** Resolve connectors the way this agent's conversation does (agent-owned first). */
       agentId?: string;
+      /**
+       * On desktop, run a localhost / LAN http plugin over IPC instead of the
+       * server relay. Only an MCP App view's calls set it, as its HTML was read
+       * the same way; conversation calls keep their existing route.
+       */
+      localHttpOverIpc?: boolean;
       signal?: AbortSignal;
       topicId?: string;
     },
@@ -167,7 +174,10 @@ class MCPService {
     const isCloud = plugin?.customParams?.mcp?.type === 'cloud';
     // localhost / LAN endpoints are only reachable from this machine
     const isLocalHttp =
-      isDesktop && plugin?.customParams?.mcp?.type === 'http' && isLocalOrPrivateUrl(params.url);
+      !!localHttpOverIpc &&
+      isDesktop &&
+      plugin?.customParams?.mcp?.type === 'http' &&
+      isLocalOrPrivateUrl(params.url);
     const isCustomPlugin = !!customPlugin;
 
     // Build meta for server-side reporting

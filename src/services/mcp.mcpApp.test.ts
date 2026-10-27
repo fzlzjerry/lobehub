@@ -248,19 +248,18 @@ describe('mcpService.invokeMcpToolCall on desktop', () => {
     ipcCall.mockResolvedValue(serializeMcpIpcPayload({ content: 'ok', success: true }));
   });
 
-  it('calls localhost / LAN http servers over IPC, not the server relay', async () => {
+  const refresh = {
+    apiName: 'refresh',
+    arguments: '{"city":"Paris"}',
+    id: 't1',
+    identifier: 'local',
+    type: 'mcp',
+  } as const;
+
+  it('calls localhost / LAN http servers over IPC for a view, not the server relay', async () => {
     plugins.set('local', httpPlugin('http://127.0.0.1:3000/mcp'));
 
-    await mcpService.invokeMcpToolCall(
-      {
-        apiName: 'refresh',
-        arguments: '{"city":"Paris"}',
-        id: 't1',
-        identifier: 'local',
-        type: 'mcp',
-      },
-      {},
-    );
+    await mcpService.invokeMcpToolCall(refresh, { localHttpOverIpc: true });
 
     expect(relayCall).not.toHaveBeenCalled();
     expect(deserializeMcpIpcPayload(ipcCall.mock.calls[0][0])).toEqual({
@@ -268,5 +267,18 @@ describe('mcpService.invokeMcpToolCall on desktop', () => {
       http: { headers: { 'x-key': 'k' }, name: 'local', url: 'http://127.0.0.1:3000/mcp' },
       toolName: 'refresh',
     });
+  });
+
+  it('keeps conversation calls to localhost / LAN http servers on their existing route', async () => {
+    plugins.set('local', httpPlugin('http://127.0.0.1:3000/mcp'));
+    relayCall.mockResolvedValue({ content: 'ok', success: true });
+
+    await mcpService.invokeMcpToolCall(refresh, {});
+
+    expect(ipcCall).not.toHaveBeenCalled();
+    expect(relayCall).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: 'refresh' }),
+      expect.anything(),
+    );
   });
 });

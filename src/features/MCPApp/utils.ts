@@ -67,6 +67,21 @@ export const buildAppCsp = (csp: McpUiResourceCsp | undefined): string => {
   ].join('; ');
 };
 
+/**
+ * The view iframe's `allow` policy: these features stay off whatever the
+ * resource's `_meta.ui.permissions` declares. Nothing asks the user before a
+ * view would use them (desktop grants any request in the main window, and on
+ * the web a grant to LobeHub covers every later view), so a server's
+ * declaration alone must not reach the camera, microphone, location or
+ * clipboard.
+ */
+export const APP_IFRAME_ALLOW = [
+  `camera 'none'`,
+  `microphone 'none'`,
+  `geolocation 'none'`,
+  `clipboard-write 'none'`,
+].join('; ');
+
 const escapeAttribute = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 
 /**

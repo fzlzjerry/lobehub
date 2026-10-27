@@ -1,9 +1,9 @@
 'use client';
 
 import { safeParseJSON } from '@lobechat/utils';
-import { Button, createModal, Flexbox, Skeleton } from '@lobehub/ui';
+import { Skeleton } from '@lobehub/ui';
 import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
-import { type AppBridge, buildAllowAttribute } from '@modelcontextprotocol/ext-apps/app-bridge';
+import { type AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
 import * as stylex from '@stylexjs/stylex';
 import { useLatest } from 'ahooks';
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,10 +14,21 @@ import { useIsDark } from '@/hooks/useIsDark';
 import { useClientDataSWR } from '@/libs/swr';
 import { mcpAppKeys } from '@/libs/swr/keys';
 import { mcpService } from '@/services/mcp';
+import { getToolStoreState } from '@/store/tool';
 
+import { mcpAppNameSelector } from './appName';
 import { buildHostContext, connectMcpAppBridge } from './bridge';
+import { confirmAppMessage, confirmAppToolCall } from './confirm';
 import { getAppToolCallPolicy } from './toolCallPolicy';
-import { buildAppCsp, injectCsp, pickAppResource, toAppMessage, toCallToolResult } from './utils';
+import { createViewGestureGate } from './userGesture';
+import {
+  APP_IFRAME_ALLOW,
+  buildAppCsp,
+  injectCsp,
+  pickAppResource,
+  toAppMessage,
+  toCallToolResult,
+} from './utils';
 
 const DEFAULT_HEIGHT = 320;
 const MAX_HEIGHT = 2000;
@@ -56,37 +67,8 @@ export interface McpAppViewProps {
   toolCallId: string;
 }
 
-/** Resolves false on Cancel and on any other dismissal (Esc, mask, close). */
-const confirmAppToolCall = (texts: {
-  cancelText: string;
-  content: string;
-  okText: string;
-  title: string;
-}) =>
-  new Promise<boolean>((resolve) => {
-    let settled = false;
-    const settle = (allowed: boolean) => {
-      if (settled) return;
-      settled = true;
-      resolve(allowed);
-      modal.close();
-    };
-    const modal = createModal({
-      content: texts.content,
-      footer: (
-        <Flexbox horizontal gap={8} justify={'flex-end'}>
-          <Button onClick={() => settle(false)}>{texts.cancelText}</Button>
-          <Button type={'primary'} onClick={() => settle(true)}>
-            {texts.okText}
-          </Button>
-        </Flexbox>
-      ),
-      onOpenChange: (open) => {
-        if (!open) settle(false);
-      },
-      title: texts.title,
-    });
-  });
+const getAppName = (identifier: string, agentId?: string) =>
+  mcpAppNameSelector(identifier, agentId)(getToolStoreState());
 
 /**
  * Renders an MCP Apps (SEP-1865) view: the `ui://` HTML a tool declares, in a
@@ -119,26 +101,30 @@ const McpAppView = memo<McpAppViewProps>(
     const bridgeRef = useRef<AppBridge>(undefined);
 
     useEffect(() => {
-      const target = iframeRef.current?.contentWindow;
-      if (!srcDoc || !target) return;
+      const iframe = iframeRef.current;
+      const target = iframe?.contentWindow;
+      if (!srcDoc || !iframe || !target) return;
+
+      const gestures = createViewGestureGate();
+      // One message at a time, so a view can't line up runs behind a pending one
+      let sending = false;
 
       const { bridge, dispose } = connectMcpAppBridge(target, {
         // Views may only call tools on the server that rendered them, and
         // under the same approval rules as the conversation.
         callTool: async (name, toolArgs) => {
           const { agentId: currentAgentId, identifier: currentIdentifier, t: tr } = latest.current;
-          const policy = getAppToolCallPolicy(currentIdentifier, name, currentAgentId);
+          const policy = getAppToolCallPolicy(currentIdentifier, name, {
+            agentId: currentAgentId,
+            toolArgs,
+          });
           const allowed =
             policy === 'allow' ||
             (policy === 'confirm' &&
               (await confirmAppToolCall({
-                cancelText: tr('mcpApp.toolCall.confirm.cancel'),
-                content: tr('mcpApp.toolCall.confirm.content', {
-                  app: currentIdentifier,
-                  tool: name,
-                }),
-                okText: tr('mcpApp.toolCall.confirm.ok'),
-                title: tr('mcpApp.toolCall.confirm.title'),
+                appName: getAppName(currentIdentifier, currentAgentId),
+                args: toolArgs,
+                tool: name,
               })));
 
           if (!allowed) {
@@ -157,14 +143,39 @@ const McpAppView = memo<McpAppViewProps>(
                 identifier: currentIdentifier,
                 type: 'mcp',
               },
-              { agentId: currentAgentId },
+              // The view's HTML came from this machine for a local server, so its calls do too
+              { agentId: currentAgentId, localHttpOverIpc: true },
             ),
           );
         },
         hostContext: buildHostContext(latest.current.isDark),
         onSizeChange: (nextHeight) => setHeight(Math.min(nextHeight, MAX_HEIGHT)),
-        sendMessage: (text) =>
-          latest.current.sendMessage(toAppMessage(text, latest.current.identifier)),
+        // A message starts a billed run, and a view can post one on load (every
+        // time the topic reopens). Without a gesture in the view just before,
+        // the user confirms it first.
+        sendMessage: async (text) => {
+          if (sending) return false;
+          // Read before anything async: the activation expires
+          const fromUser = gestures.hasGestureIn(iframe);
+          sending = true;
+          try {
+            const { agentId: currentAgentId, identifier: currentIdentifier } = latest.current;
+            if (
+              !fromUser &&
+              !(await confirmAppMessage({
+                appName: getAppName(currentIdentifier, currentAgentId),
+                text,
+              }))
+            ) {
+              return false;
+            }
+
+            await latest.current.sendMessage(toAppMessage(text, currentIdentifier));
+            return true;
+          } finally {
+            sending = false;
+          }
+        },
         toolInput: () => safeParseJSON(latest.current.args || '{}') ?? {},
         toolResult: () => {
           const { result: toolResult } = latest.current;
@@ -175,6 +186,7 @@ const McpAppView = memo<McpAppViewProps>(
 
       return () => {
         bridgeRef.current = undefined;
+        gestures.dispose();
         dispose();
       };
     }, [latest, srcDoc, toolCallId]);
@@ -193,7 +205,7 @@ const McpAppView = memo<McpAppViewProps>(
     return (
       <div {...stylex.props(resource?.meta?.prefersBorder !== false && styles.bordered)}>
         <iframe
-          allow={buildAllowAttribute(resource?.meta?.permissions)}
+          allow={APP_IFRAME_ALLOW}
           ref={iframeRef}
           // No `allow-same-origin`: the view runs on an opaque origin and can
           // reach LobeHub only through the postMessage bridge.

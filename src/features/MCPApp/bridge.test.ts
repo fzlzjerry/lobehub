@@ -79,6 +79,19 @@ describe('connectMcpAppBridge', () => {
       params: { content: [{ text: 'Plan a trip to Rome', type: 'text' }], role: 'user' },
     });
     expect(host.sendMessage).toHaveBeenCalledWith('Plan a trip to Rome');
+    expect(response(3)?.result).toEqual({});
+  });
+
+  it('answers a message the host declined with an error', async () => {
+    const { fromView, response } = setup({ sendMessage: vi.fn().mockResolvedValue(false) });
+    await fromView({ method: 'ui/notifications/initialized' });
+
+    await fromView({
+      id: 6,
+      method: 'ui/message',
+      params: { content: [{ text: 'Plan a trip to Rome', type: 'text' }], role: 'user' },
+    });
+    expect(response(6)?.result).toEqual({ isError: true });
   });
 
   it('only opens http(s) links', async () => {

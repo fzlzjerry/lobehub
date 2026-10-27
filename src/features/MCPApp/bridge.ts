@@ -21,8 +21,8 @@ export interface McpAppBridgeHost {
   callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>;
   hostContext: McpUiHostContext;
   onSizeChange: (height: number) => void;
-  /** Post a user message into the conversation. */
-  sendMessage: (text: string) => Promise<unknown> | unknown;
+  /** Post a user message into the conversation; resolves `false` when the host declined it. */
+  sendMessage: (text: string) => Promise<boolean | void> | boolean | void;
   toolInput: () => Record<string, unknown>;
   toolResult: () => CallToolResult;
 }
@@ -48,8 +48,8 @@ export const connectMcpAppBridge = (target: Window, host: McpAppBridgeHost) => {
       .trim();
     if (!text) return { isError: true };
 
-    await host.sendMessage(text);
-    return {};
+    const sent = await host.sendMessage(text);
+    return sent === false ? { isError: true } : {};
   };
 
   bridge.onopenlink = async ({ url }) => {

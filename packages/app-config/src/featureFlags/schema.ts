@@ -92,6 +92,13 @@ export const FeatureFlagsSchema = z.object({
    */
   mcp_app: FeatureFlagValue.optional(),
 
+  /**
+   * Multi-agent Channels: the sidebar section, Channel pages and every Channel API, including
+   * Agent history reads (`lobe-channel`, `lh channel`). Off: none of it is reachable. Work that
+   * was already queued still finishes. Array values are user ids, checked per member.
+   */
+  channel: FeatureFlagValue.optional(),
+
   // internal flag
   agent_onboarding: FeatureFlagValue.optional(),
   dev_dock: FeatureFlagValue.optional(),
@@ -171,6 +178,9 @@ export const DEFAULT_FEATURE_FLAGS: IFeatureFlags = {
   // Off until an admin publishes a user allowlist or flips it to true.
   mcp_app: false,
 
+  // Off until an admin publishes a user allowlist or flips it to true.
+  channel: false,
+
   agent_onboarding: isDev,
   dev_dock: isDev,
   auth_captcha: true,
@@ -208,6 +218,7 @@ export const mapFeatureFlagsEnvToState = (
     enableLlmRelay: evaluateFeatureFlag(config.agent_llm_relay, userId),
     enableDashboard: evaluateFeatureFlag(config.dashboard, userId),
     enableMcpApp: evaluateFeatureFlag(config.mcp_app, userId),
+    enableChannels: evaluateFeatureFlag(config.channel, userId),
     showProvider: evaluateFeatureFlag(config.provider_settings, userId),
 
     showOpenAIApiKey: evaluateFeatureFlag(config.openai_api_key, userId),

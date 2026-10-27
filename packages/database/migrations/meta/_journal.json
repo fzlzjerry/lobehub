@@ -1316,6 +1316,27 @@
       "when": 1792987514341,
       "tag": "0187_channel_preserve_active_writer",
       "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1793034171659,
+      "tag": "0188_workspace_member_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1793075261489,
+      "tag": "0189_channel_soft_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1793084535893,
+      "tag": "0190_channel_status",
+      "breakpoints": true
     }
   ],
   "version": "6"

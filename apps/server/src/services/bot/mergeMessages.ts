@@ -72,8 +72,12 @@ const REPLAY_ID_SUFFIX = /:replay:\d+:\d+$/;
  * pipeline keys on the platform id — the wake scheduler releases a batch by the ids it parked, so
  * it has to match the original id rather than the replay one.
  */
-export const getOriginMessageId = (message: Message): string =>
+export const getOriginMessageId = (message: Pick<Message, 'id'>): string =>
   message.id.replace(REPLAY_ID_SUFFIX, '');
+
+/** Whether {@link buildReplayMessages} produced this message from a parked one. */
+export const isReplayMessage = (message: Pick<Message, 'id'>): boolean =>
+  REPLAY_ID_SUFFIX.test(message.id);
 
 /**
  * Rebuild original messages from deferred payloads (oldest first).

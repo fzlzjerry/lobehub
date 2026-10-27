@@ -57,6 +57,16 @@ vi.mock('@/services/agentBotProvider', () => ({
 
 vi.mock('@/hooks/useAppOrigin', () => ({ useAppOrigin: () => 'https://example.test' }));
 
+/** The custom-instructions and duties text areas, told apart by their placeholders. */
+const textAreaWith = (container: HTMLElement, placeholderKey: string) =>
+  container.querySelector<HTMLTextAreaElement>(
+    `textarea[placeholder="${CSS.escape(agentEn[placeholderKey as keyof typeof agentEn] as string)}"]`,
+  );
+const instructionsArea = (container: HTMLElement) =>
+  textAreaWith(container, 'channel.botWakeCustomInstructionsPlaceholder');
+const dutiesArea = (container: HTMLElement) =>
+  textAreaWith(container, 'channel.botWakeDutiesPlaceholder');
+
 const platformDef = {
   documentation: {},
   id: 'discord',
@@ -221,13 +231,13 @@ describe('channel settings form: bot-wake options', () => {
     expect(screen.queryByText('Record only')).not.toBeInTheDocument();
   });
 
-  it('groups the options into keywords, channels, pace and judgement, each under its own title', () => {
+  it('groups the options into judgement, keywords, channels and pace, each under its own title', () => {
     state.copy = en;
     state.featureFlags = { enableBotWake: true };
 
     render(<Harness settings={{ botWakeEnabled: true }} />);
 
-    const titles = ['keywords', 'channels', 'pace', 'judgement'].map((key) =>
+    const titles = ['judgement', 'keywords', 'channels', 'pace'].map((key) =>
       screen.getByText(en[`channel.wake.section.${key}`]),
     );
     // Titles come in page order.
@@ -257,12 +267,29 @@ describe('channel settings form: bot-wake options', () => {
       <Harness settings={{ botWakeCustomInstructionsEnabled: true, botWakeEnabled: true }} />,
     );
 
-    const area = container.querySelector('textarea')!;
+    const area = instructionsArea(container)!;
     expect(area).toBeInTheDocument();
     expect(Number(area.getAttribute('rows'))).toBeGreaterThanOrEqual(8);
     expect(Number(area.getAttribute('maxlength'))).toBeGreaterThanOrEqual(2000);
-    // The only multi-line field: the others stay single-line.
-    expect(container.querySelectorAll('textarea')).toHaveLength(1);
+    // Multi-line next to the duties only: the others stay single-line.
+    expect(container.querySelectorAll('textarea')).toHaveLength(2);
+  });
+
+  it('opens the wake options with the duties: a text area, empty by default, and its dial', () => {
+    state.copy = en;
+    state.featureFlags = { enableBotWake: true };
+
+    const { container } = render(<Harness settings={{ botWakeEnabled: true }} />);
+
+    const title = screen.getByText(en['channel.wake.section.judgement']);
+    const label = screen.getByText(en['channel.botWakeDuties']);
+    expect(title).toHaveTextContent('Duties');
+    expect(title.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(dutiesArea(container)).toHaveValue('');
+    expect(screen.getByText(en['channel.botWakeDutiesThreshold'])).toBeInTheDocument();
+    // The retired options are gone from the page.
+    expect(screen.queryByText('Help me')).not.toBeInTheDocument();
+    expect(screen.queryByText('Help others')).not.toBeInTheDocument();
   });
 
   it('keeps the text area folded until its switch is on', () => {
@@ -272,7 +299,7 @@ describe('channel settings form: bot-wake options', () => {
     const { container } = render(<Harness settings={{ botWakeEnabled: true }} />);
 
     expect(screen.getByText(en['channel.botWakeCustomInstructionsEnabled'])).toBeInTheDocument();
-    expect(container.querySelector('textarea')).not.toBeInTheDocument();
+    expect(instructionsArea(container)).not.toBeInTheDocument();
   });
 
   it('shows instructions saved before the switch existed, switched on', () => {
@@ -289,9 +316,7 @@ describe('channel settings form: bot-wake options', () => {
       />,
     );
 
-    expect(container.querySelector('textarea')).toHaveValue(
-      'Only answer billing questions.\nNever joke.',
-    );
+    expect(instructionsArea(container)).toHaveValue('Only answer billing questions.\nNever joke.');
   });
 
   describe('a Save in the corner of each block', () => {
@@ -332,8 +357,8 @@ describe('channel settings form: bot-wake options', () => {
       expect(enabled).toHaveLength(1);
       fireEvent.click(enabled[0]);
       expect(onSave).toHaveBeenCalledWith('wake-pace');
-      // It sits in the Pace block, between the channels and the judgement.
-      expect(saveButtons().indexOf(enabled[0])).toBe(2);
+      // It sits in the Pace block, the last one, after the judgement, keywords and channels.
+      expect(saveButtons().indexOf(enabled[0])).toBe(3);
     });
 
     it('discards one block’s changes by id', () => {

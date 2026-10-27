@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BOT_WAKE_SETTING_KEYS } from '@/server/services/agentSignal/scenarios/botWake/config';
+import { botWakeFields } from '@/server/services/bot/platforms/botWakeFields';
 import type { FieldSchema } from '@/server/services/bot/platforms/types';
 
 import { getSchemaFields, groupSettingsFields, groupWakeFields } from './settingsGroups';
@@ -119,7 +120,7 @@ describe('groupWakeFields', () => {
   const keysOf = (fields: FieldSchema[]) =>
     groupWakeFields(fields).map((section) => [section.key, section.fields.map((f) => f.key)]);
 
-  it('splits the wake options into keywords, channels, pace and judgement, in that order', () => {
+  it('splits the wake options into judgement, keywords, channels and pace, in that order', () => {
     // Deliberately shuffled: the sections decide the order, not the schema.
     const fields = [
       K.customInstructions,
@@ -137,6 +138,7 @@ describe('groupWakeFields', () => {
     ].map(field);
 
     expect(keysOf(fields)).toEqual([
+      ['judgement', [K.customInstructions]],
       ['keywords', ['watchKeywords']],
       ['channels', [K.scope, K.allowChannels, K.denyChannels]],
       [
@@ -151,30 +153,34 @@ describe('groupWakeFields', () => {
           K.cooldownSeconds,
         ],
       ],
-      ['judgement', [K.customInstructions]],
     ]);
   });
 
-  it('orders initiative as for me, for others, then the instructions, each switch above its dial', () => {
+  it('opens with the duties and their dial, then the instructions, each switch above its text', () => {
     const section = groupWakeFields(
-      [
-        K.customInstructions,
-        K.classifierInitiateThreshold,
-        K.proactiveThreshold,
-        K.customInstructionsEnabled,
-        K.classifierInitiateEnabled,
-        K.proactiveEnabled,
-      ].map(field),
+      [K.customInstructions, K.dutiesThreshold, K.customInstructionsEnabled, K.duties].map(field),
     ).find((s) => s.key === 'judgement')!;
 
     expect(section.fields.map((f) => f.key)).toEqual([
-      K.proactiveEnabled,
-      K.proactiveThreshold,
-      K.classifierInitiateEnabled,
-      K.classifierInitiateThreshold,
+      K.duties,
+      K.dutiesThreshold,
       K.customInstructionsEnabled,
       K.customInstructions,
     ]);
+  });
+
+  it('shows the shipped schema the duties first, and nothing of help-me or help-others', () => {
+    const sections = groupWakeFields(botWakeFields);
+    const keys = sections.flatMap((section) => section.fields.map((f) => f.key));
+
+    expect(sections.map((section) => section.key)).toEqual(['judgement', 'channels', 'pace']);
+    expect(sections[0].fields.map((f) => f.key)).toEqual([
+      K.duties,
+      K.dutiesThreshold,
+      K.customInstructionsEnabled,
+      K.customInstructions,
+    ]);
+    expect(keys.filter((key) => /Proactive|Initiate/.test(key))).toEqual([]);
   });
 
   it('shows only the keywords until the rollout reaches the user', () => {

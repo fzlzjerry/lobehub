@@ -3,7 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mcpRouter } from './mcp';
 
-const mockReadUiResource = vi.hoisted(() => vi.fn());
+const { mockCallTool, mockMcpAppEnabled, mockReadUiResource } = vi.hoisted(() => ({
+  mockCallTool: vi.fn(),
+  mockMcpAppEnabled: vi.fn(),
+  mockReadUiResource: vi.fn(),
+}));
+
+vi.mock('@/server/services/mcp/featureGate', () => ({ isMcpAppEnabled: mockMcpAppEnabled }));
+
+vi.mock('./_helpers', () => ({ scheduleToolCallReport: vi.fn() }));
+
+// Not a connector: the call skips the connector permission gate
+vi.mock('@/database/models/connector', () => ({
+  ConnectorModel: vi.fn(function () {
+    return { queryByIdentifiers: vi.fn().mockResolvedValue([]) };
+  }),
+}));
 
 vi.mock('@/libs/trpc/lambda/middleware', () => ({
   serverDatabase: vi.fn(function (opts: any) {
@@ -21,8 +36,29 @@ vi.mock('@/server/services/file', () => ({
 }));
 
 vi.mock('@/server/services/mcp', () => ({
-  mcpService: { readUiResource: mockReadUiResource },
+  mcpService: { callTool: mockCallTool, readUiResource: mockReadUiResource },
 }));
+
+describe('tools mcpRouter.callTool', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([true, false])('passes the caller mcp_app flag (%s) to the MCP call', async (enabled) => {
+    mockMcpAppEnabled.mockResolvedValue(enabled);
+    mockCallTool.mockResolvedValue({ content: 'ok', state: { content: [] }, success: true });
+    const caller = mcpRouter.createCaller({ serverDB: {}, userId: 'user-1' } as any);
+
+    await caller.callTool({
+      args: '{}',
+      params: { name: 'weather', type: 'http', url: 'https://mcp.example.com/mcp' },
+      toolName: 'forecast',
+    });
+
+    expect(mockMcpAppEnabled).toHaveBeenCalledWith('user-1');
+    expect(mockCallTool).toHaveBeenCalledWith(expect.objectContaining({ mcpApp: enabled }));
+  });
+});
 
 describe('tools mcpRouter.readUiResource', () => {
   beforeEach(() => {

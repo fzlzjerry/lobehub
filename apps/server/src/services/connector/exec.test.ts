@@ -12,6 +12,8 @@ vi.mock('@/server/services/mcp', () => ({
   mcpService: { callTool: vi.fn(), readUiResource: vi.fn() },
 }));
 vi.mock('@/server/services/deviceGateway', () => ({ deviceGateway: { isConfigured: false } }));
+const mcpAppEnabled = vi.hoisted(() => vi.fn().mockResolvedValue(false));
+vi.mock('@/server/services/mcp/featureGate', () => ({ isMcpAppEnabled: mcpAppEnabled }));
 vi.mock('./tokens', () => ({ ensureFreshConnectorToken: vi.fn(async (c) => c) }));
 // The background tool-list refresh is exercised in refresh.test.ts. Here we only
 // verify the call site wires it up and stays isolated from it.
@@ -105,6 +107,17 @@ describe('callConnectorToolById', () => {
         toolName: 'do_thing',
       }),
     );
+  });
+
+  it.each([true, false])('passes the caller mcp_app flag (%s) through', async (enabled) => {
+    mcpAppEnabled.mockResolvedValueOnce(enabled);
+    vi.mocked(mcpService.callTool).mockResolvedValue({ success: true });
+    const ctx = { ...makeCtx([connector], [tool()]), userId: 'user-1' };
+
+    await callConnectorToolById({ identifier: 'my-conn', toolName: 'do_thing' }, ctx);
+
+    expect(mcpAppEnabled).toHaveBeenCalledWith('user-1');
+    expect(mcpService.callTool).toHaveBeenCalledWith(expect.objectContaining({ mcpApp: enabled }));
   });
 
   it('uses the refreshed token when the connector token was refreshed', async () => {

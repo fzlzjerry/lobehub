@@ -3,6 +3,7 @@ import { isLocalOrPrivateUrl } from '@lobechat/utils';
 import { ConnectorMcpConnectionType, ConnectorToolPermission } from '@/database/schemas';
 import { deviceGateway } from '@/server/services/deviceGateway';
 import { mcpService } from '@/server/services/mcp';
+import { isMcpAppEnabled } from '@/server/services/mcp/featureGate';
 
 import { buildLastSyncedAtMap, scheduleStaleConnectorToolsRefresh } from './refresh';
 import { buildConnectorMcpParams, type ConnectorToolSyncContext } from './sync';
@@ -46,7 +47,8 @@ const findConnector = (
  */
 export const callConnectorToolById = async (
   params: { agentId?: string; args?: string; identifier: string; toolName: string },
-  ctx: ConnectorToolSyncContext,
+  /** `userId` decides the caller's `mcp_app` flag: whether the result may carry an MCP App view. */
+  ctx: ConnectorToolSyncContext & { userId?: string | null },
 ): Promise<unknown> => {
   const [connector] = await findConnector(params, ctx);
   if (!connector) {
@@ -117,6 +119,7 @@ export const callConnectorToolById = async (
   return mcpService.callTool({
     argsStr: params.args ?? '{}',
     clientParams: buildConnectorMcpParams(fresh),
+    mcpApp: await isMcpAppEnabled(ctx.userId),
     toolName: params.toolName,
   });
 };

@@ -17,6 +17,7 @@ import { serverDatabase, telemetry } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
 import { mcpService } from '@/server/services/mcp';
 import { processContentBlocks } from '@/server/services/mcp/contentProcessor';
+import { isMcpAppEnabled } from '@/server/services/mcp/featureGate';
 
 import { scheduleToolCallReport } from './_helpers';
 
@@ -186,6 +187,7 @@ export const mcpRouter = router({
         result = await mcpService.callTool({
           argsStr: input.args,
           clientParams: input.params,
+          mcpApp: await isMcpAppEnabled(ctx.userId),
           processContentBlocks: boundProcessContentBlocks,
           toolName: input.toolName,
         });

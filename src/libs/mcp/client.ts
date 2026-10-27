@@ -162,18 +162,27 @@ async function preCheckStdioCommand(params: {
   });
 }
 
+export interface MCPClientOptions {
+  /**
+   * Advertise MCP Apps (SEP-1865) during `initialize`, so servers expose their
+   * interactive views. Off: the client announces itself as it did before MCP
+   * Apps, and servers answer as they would any other client.
+   */
+  mcpApp?: boolean;
+}
+
 export class MCPClient {
   private mcp: Client;
   private transport: Transport;
   private params: MCPClientParams;
-  /** tool name → `ui://` resource URI, filled from the last `listTools` */
+  /** tool name → `ui://` resource URI, filled from the last successful `listTools` */
   private uiResourceUris?: Map<string, string>;
 
-  constructor(params: MCPClientParams) {
+  constructor(params: MCPClientParams, { mcpApp = false }: MCPClientOptions = {}) {
     this.params = params;
     this.mcp = new Client(
       { name: 'lobehub-mcp-client', version: '1.0.0' },
-      { capabilities: MCP_APP_CLIENT_CAPABILITIES },
+      mcpApp ? { capabilities: MCP_APP_CLIENT_CAPABILITIES } : undefined,
     );
 
     switch (params.type) {
@@ -428,12 +437,17 @@ export class MCPClient {
 
   /**
    * The MCP Apps `ui://` resource a tool renders its result with, if any.
-   * Lists tools once per client to learn it.
+   * Lists tools once per client to learn it. A failed listing counts as "no
+   * views" instead of being retried on every call; a later successful
+   * `listTools` on this client (a manifest refresh) fills the map again.
    */
   async getToolUiResourceUri(toolName: string): Promise<string | undefined> {
-    if (!this.uiResourceUris) await this.listTools();
+    if (!this.uiResourceUris) {
+      await this.listTools();
+      this.uiResourceUris ??= new Map();
+    }
 
-    return this.uiResourceUris?.get(toolName);
+    return this.uiResourceUris.get(toolName);
   }
 
   async readResource(uri: string) {

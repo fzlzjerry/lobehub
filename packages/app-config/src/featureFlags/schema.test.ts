@@ -225,6 +225,17 @@ describe('mapFeatureFlagsEnvToState', () => {
     expect(mapFeatureFlagsEnvToState(config).enableDashboard).toBe(false);
   });
 
+  it('should keep MCP Apps views off by default and enable them per user or globally', () => {
+    expect(DEFAULT_FEATURE_FLAGS.mcp_app).toBe(false);
+    expect(mapFeatureFlagsEnvToState(DEFAULT_FEATURE_FLAGS, 'user-1').enableMcpApp).toBe(false);
+
+    expect(mapFeatureFlagsEnvToState({ mcp_app: true }).enableMcpApp).toBe(true);
+
+    const config = { mcp_app: ['user-123'] };
+    expect(mapFeatureFlagsEnvToState(config, 'user-123').enableMcpApp).toBe(true);
+    expect(mapFeatureFlagsEnvToState(config, 'user-456').enableMcpApp).toBe(false);
+  });
+
   it('should correctly map boolean feature flags to state', () => {
     const config = {
       provider_settings: true,

@@ -9,9 +9,17 @@ import type { AssistantContentBlock } from '@/types/index';
 
 import Group from './Group';
 
-const { mounts, state } = vi.hoisted(() => ({
+const { flags, mounts, state } = vi.hoisted(() => ({
+  flags: { enableMcpApp: true },
   mounts: [] as string[],
   state: { operations: [] as { metadata: Record<string, unknown>; status: string }[] },
+}));
+
+vi.mock('@/store/serverConfig', () => ({
+  serverConfigSelectors: {
+    enableMcpApp: (s: { featureFlags: typeof flags }) => s.featureFlags.enableMcpApp,
+  },
+  useServerConfigStore: (selector: (s: unknown) => unknown) => selector({ featureFlags: flags }),
 }));
 
 vi.mock('@/store/chat', () => ({
@@ -80,6 +88,7 @@ const blocks: AssistantContentBlock[] = [
 
 afterEach(() => {
   cleanup();
+  flags.enableMcpApp = true;
   mounts.length = 0;
   state.operations = [];
 });
@@ -117,5 +126,19 @@ describe('Group with an MCP App view', () => {
     expect(view.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Folding must not remount (and so reload) the view.
     expect(mounts.filter((id) => id === 'step-3')).toHaveLength(1);
+  });
+
+  it('folds the view with the rest of the process while the mcp_app flag is off', () => {
+    flags.enableMcpApp = false;
+    render(
+      <Group enableProcessFold isLatestItem blocks={blocks} id="assistant-1" messageIndex={0} />,
+    );
+
+    const fold = screen.getByTestId('process-fold');
+    const items = screen.queryAllByTestId('group-item');
+
+    expect(items.find((node) => node.dataset.id === 'step-3')).toBeUndefined();
+    expect(fold).toContainElement(screen.getByTestId('workflow-segment'));
+    expect(items.find((node) => node.dataset.id === 'step-4')).toBeDefined();
   });
 });

@@ -84,6 +84,14 @@ export const FeatureFlagsSchema = z.object({
    */
   dashboard: FeatureFlagValue.optional(),
 
+  /**
+   * MCP Apps: a tool result that declares an interactive `ui://` view renders
+   * that view (third-party HTML in a sandboxed iframe) in the conversation and
+   * stays on screen when the turn folds. Off: such results render as plain
+   * tool results. Array values are user ids.
+   */
+  mcp_app: FeatureFlagValue.optional(),
+
   // internal flag
   agent_onboarding: FeatureFlagValue.optional(),
   dev_dock: FeatureFlagValue.optional(),
@@ -160,6 +168,9 @@ export const DEFAULT_FEATURE_FLAGS: IFeatureFlags = {
   // Off until an admin publishes a user allowlist or flips it to true.
   dashboard: false,
 
+  // Off until an admin publishes a user allowlist or flips it to true.
+  mcp_app: false,
+
   agent_onboarding: isDev,
   dev_dock: isDev,
   auth_captcha: true,
@@ -196,6 +207,7 @@ export const mapFeatureFlagsEnvToState = (
     enableBotWake: evaluateFeatureFlag(config.bot_wake, userId),
     enableLlmRelay: evaluateFeatureFlag(config.agent_llm_relay, userId),
     enableDashboard: evaluateFeatureFlag(config.dashboard, userId),
+    enableMcpApp: evaluateFeatureFlag(config.mcp_app, userId),
     showProvider: evaluateFeatureFlag(config.provider_settings, userId),
 
     showOpenAIApiKey: evaluateFeatureFlag(config.openai_api_key, userId),

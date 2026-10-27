@@ -7,6 +7,7 @@ import ContentLoading from '@/features/Conversation/Messages/components/ContentL
 import { useChatStore } from '@/store/chat';
 import { operationSelectors } from '@/store/chat/slices/operation/selectors';
 import type { OperationStatus } from '@/store/chat/slices/operation/types';
+import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 import type { AssistantContentBlock } from '@/types/index';
 
 import { messageStateSelectors, useConversationStore } from '../../../store';
@@ -139,16 +140,20 @@ const Group = memo<GroupChildrenProps>(
       () => chains.map((chain) => ({ assistantGroupId: chain.id })),
       [chains],
     );
+    // Off: no view is lifted or broken out, and the turn renders as it did
+    // before MCP Apps.
+    const enableMcpApp = useServerConfigStore(serverConfigSelectors.enableMcpApp);
 
     const views = useMemo(
       () =>
         chainsWithFinishTypes.map((chain, index) =>
           buildChainView(chain, {
+            enableMcpApp,
             hasActiveOperation: !!activeFlags[index],
             isGenerating: !!generatingFlags[index],
           }),
         ),
-      [activeFlags, chainsWithFinishTypes, generatingFlags],
+      [activeFlags, chainsWithFinishTypes, enableMcpApp, generatingFlags],
     );
     const lastView = views.at(-1)!;
     const isGenerating = lastView.isGenerating;
@@ -179,14 +184,18 @@ const Group = memo<GroupChildrenProps>(
         key={`${view.id}.${variant}`}
         value={contextValues[views.indexOf(view)]!}
       >
-        {/* Keyed by the segment's place in the whole turn, not in this slice:
-            folding changes the slice, and a positional key would remount a
-            segment that stays on screen. */}
-        {segments.map((segment) => (
-          <Fragment key={view.segments.indexOf(segment)}>
-            {renderChainSegment(view, segment, renderOptions)}
-          </Fragment>
-        ))}
+        {/* With lifted views, keyed by the segment's place in the whole turn,
+            not in this slice: folding changes the slice, and a positional key
+            would remount a view that stays on screen. */}
+        {segments.map((segment) =>
+          enableMcpApp ? (
+            <Fragment key={view.segments.indexOf(segment)}>
+              {renderChainSegment(view, segment, renderOptions)}
+            </Fragment>
+          ) : (
+            renderChainSegment(view, segment, renderOptions)
+          ),
+        )}
       </MessageAggregationContext>
     );
 
@@ -207,7 +216,9 @@ const Group = memo<GroupChildrenProps>(
     // reload) a view the user may already be using.
     const splits = views.map((view) => {
       const split = splitAssistantGroupFinalAnswer(view.segments);
-      const { folded, lifted } = liftMcpAppSegments(split.processSegments);
+      const { folded, lifted } = enableMcpApp
+        ? liftMcpAppSegments(split.processSegments)
+        : { folded: split.processSegments, lifted: [] };
 
       return { ...split, liftedSegments: lifted, processSegments: folded };
     });
@@ -228,8 +239,12 @@ const Group = memo<GroupChildrenProps>(
       const segments = splits[index]!.processSegments;
       if (segments.length === 0) return null;
       // Only intermediate prose is left once the views are lifted: nothing to fold.
-      if (!segments.some((segment) => segment.kind === 'workflow'))
+      if (
+        splits[index]!.liftedSegments.length > 0 &&
+        !segments.some((segment) => segment.kind === 'workflow')
+      ) {
         return renderChain(view, segments, 'folded');
+      }
       const durationMs = chainDurations[index] ?? 0;
       return (
         <ProcessFold

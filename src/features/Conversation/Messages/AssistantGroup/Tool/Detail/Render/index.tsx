@@ -6,6 +6,7 @@ import { memo } from 'react';
 import { useToolResultPayload } from '@/hooks/useToolResultPayload';
 import { getMcpAppFromState, unwrapMcpToolState } from '@/libs/mcp/mcpApp';
 import dynamic from '@/libs/next/dynamic';
+import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 
 import { dataSelectors, useConversationStore } from '../../../../../store';
 import CustomRender from './CustomRender';
@@ -25,6 +26,7 @@ interface ToolRenderProps {
 const ToolRender = memo<ToolRenderProps>(
   ({ showCustomToolRender, content, messageId, plugin, pluginState, toolCallId }) => {
     const hasCustomRender = !!getBuiltinRender(plugin?.identifier, plugin?.apiName);
+    const enableMcpApp = useServerConfigStore(serverConfigSelectors.enableMcpApp);
 
     // Tools whose card renders the stored body — the read path projected it away
     // and this component is where it comes back. Safe to fetch on mount: the
@@ -68,7 +70,7 @@ const ToolRender = memo<ToolRenderProps>(
     );
 
     // MCP Apps: the tool declared an interactive `ui://` view for its result
-    const mcpApp = getMcpAppFromState(resolvedState);
+    const mcpApp = enableMcpApp ? getMcpAppFromState(resolvedState) : undefined;
     if (mcpApp && showCustomToolRender && plugin) {
       return (
         <McpAppView

@@ -8,7 +8,8 @@ const { clientOptions, listTools } = vi.hoisted(() => ({
   listTools: vi.fn(),
 }));
 
-vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
+vi.mock('@modelcontextprotocol/client', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   Client: class {
     listTools = listTools;
     constructor(_info: unknown, options?: unknown) {

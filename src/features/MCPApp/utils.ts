@@ -1,9 +1,9 @@
 import type { MessageMetadata } from '@lobechat/types';
+import type { CallToolResult, ReadResourceResult } from '@modelcontextprotocol/client';
 import type {
   McpUiResourceCsp,
   McpUiResourceMeta,
 } from '@modelcontextprotocol/ext-apps/app-bridge';
-import type { CallToolResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 import type { MCPToolCallResult } from '@/libs/mcp/types';
 

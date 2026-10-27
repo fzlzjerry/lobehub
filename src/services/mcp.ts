@@ -8,7 +8,7 @@ import { isLocalOrPrivateUrl, safeParseJSON } from '@lobechat/utils';
 import { deserializeMcpIpcPayload, serializeMcpIpcPayload } from '@lobechat/utils/mcpIpcPayload';
 import { type PluginManifest } from '@lobehub/market-sdk';
 import { type CallReportRequest } from '@lobehub/market-types';
-import { type ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import { type ReadResourceResult } from '@modelcontextprotocol/client';
 
 import { type MCPToolCallResult } from '@/libs/mcp';
 import { toolsClient } from '@/libs/trpc/client';

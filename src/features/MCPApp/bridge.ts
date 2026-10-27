@@ -1,11 +1,11 @@
 import { CURRENT_VERSION } from '@lobechat/const';
+import type { CallToolResult } from '@modelcontextprotocol/client';
 import {
   AppBridge,
   type McpUiHostContext,
   type McpUiSizeChangedNotification,
   PostMessageTransport,
 } from '@modelcontextprotocol/ext-apps/app-bridge';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export const buildHostContext = (isDark: boolean): McpUiHostContext => ({
   availableDisplayModes: ['inline'],

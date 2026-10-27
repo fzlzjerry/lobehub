@@ -1,4 +1,5 @@
 import { deserializeMcpIpcPayload, serializeMcpIpcPayload } from '@lobechat/utils/mcpIpcPayload';
+import { SdkError, SdkErrorCode } from '@modelcontextprotocol/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { App } from '@/core/App';
@@ -124,7 +125,9 @@ describe('McpCtr MCP Apps', () => {
 
   it('evicts a dead pooled session and retries the read on a fresh one', async () => {
     const dead = makeClient({
-      readResource: vi.fn().mockRejectedValue(new Error('Not connected')),
+      readResource: vi
+        .fn()
+        .mockRejectedValue(new SdkError(SdkErrorCode.NotConnected, 'Not connected')),
     });
     const fresh = makeClient();
     mcpClientMocks.mockReturnValueOnce(dead).mockReturnValueOnce(fresh);

@@ -108,6 +108,8 @@ const McpAppView = memo<McpAppViewProps>(
       const gestures = createViewGestureGate();
       // One message at a time, so a view can't line up runs behind a pending one
       let sending = false;
+      // One approval at a time, so a view can't stack modals on top of each other
+      let confirmingToolCall = false;
 
       const { bridge, dispose } = connectMcpAppBridge(target, {
         // Views may only call tools on the server that rendered them, and
@@ -118,14 +120,20 @@ const McpAppView = memo<McpAppViewProps>(
             agentId: currentAgentId,
             toolArgs,
           });
-          const allowed =
-            policy === 'allow' ||
-            (policy === 'confirm' &&
-              (await confirmAppToolCall({
+          let allowed = policy === 'allow';
+          // A call that needs approval while another one waits for it is refused
+          if (policy === 'confirm' && !confirmingToolCall) {
+            confirmingToolCall = true;
+            try {
+              allowed = await confirmAppToolCall({
                 appName: getAppName(currentIdentifier, currentAgentId),
                 args: toolArgs,
                 tool: name,
-              })));
+              });
+            } finally {
+              confirmingToolCall = false;
+            }
+          }
 
           if (!allowed) {
             return {
@@ -151,12 +159,12 @@ const McpAppView = memo<McpAppViewProps>(
         hostContext: buildHostContext(latest.current.isDark),
         onSizeChange: (nextHeight) => setHeight(Math.min(nextHeight, MAX_HEIGHT)),
         // A message starts a billed run, and a view can post one on load (every
-        // time the topic reopens). Without a gesture in the view just before,
-        // the user confirms it first.
+        // time the topic reopens). Without a fresh gesture in the view just
+        // before, the user confirms it first. One gesture covers one message.
         sendMessage: async (text) => {
           if (sending) return false;
           // Read before anything async: the activation expires
-          const fromUser = gestures.hasGestureIn(iframe);
+          const fromUser = gestures.takeGestureIn(iframe);
           sending = true;
           try {
             const { agentId: currentAgentId, identifier: currentIdentifier } = latest.current;

@@ -31,7 +31,7 @@ describe('createViewGestureGate', () => {
     clock += ACTIVATION_WINDOW_MS;
 
     expect(document.activeElement).toBe(iframe);
-    expect(gate.hasGestureIn(iframe)).toBe(true);
+    expect(gate.takeGestureIn(iframe)).toBe(true);
     gate.dispose();
   });
 
@@ -40,7 +40,7 @@ describe('createViewGestureGate', () => {
     iframe.focus();
     clock += ACTIVATION_WINDOW_MS - 1;
 
-    expect(gate.hasGestureIn(iframe)).toBe(false);
+    expect(gate.takeGestureIn(iframe)).toBe(false);
     gate.dispose();
   });
 
@@ -51,10 +51,40 @@ describe('createViewGestureGate', () => {
     iframe.focus();
     clock += 1000;
 
-    expect(gate.hasGestureIn(iframe)).toBe(false);
+    expect(gate.takeGestureIn(iframe)).toBe(false);
 
     clock += ACTIVATION_WINDOW_MS;
-    expect(gate.hasGestureIn(iframe)).toBe(true);
+    expect(gate.takeGestureIn(iframe)).toBe(true);
+    gate.dispose();
+  });
+
+  it('counts one gesture for one message only', () => {
+    const { gate, iframe } = setup();
+    iframe.focus();
+    clock += ACTIVATION_WINDOW_MS;
+
+    expect(gate.takeGestureIn(iframe)).toBe(true);
+    // Still the same activation: a second message must not ride on it
+    clock += 100;
+    expect(gate.takeGestureIn(iframe)).toBe(false);
+    clock += ACTIVATION_WINDOW_MS - 200;
+    expect(gate.takeGestureIn(iframe)).toBe(false);
+
+    // That activation has expired, so a live one now comes from a new gesture
+    clock += 100;
+    expect(gate.takeGestureIn(iframe)).toBe(true);
+    gate.dispose();
+  });
+
+  it('does not use the gesture up when it does not count', () => {
+    const { gate, iframe } = setup();
+    clock += ACTIVATION_WINDOW_MS;
+    activation.isActive = false;
+    iframe.focus();
+
+    expect(gate.takeGestureIn(iframe)).toBe(false);
+    activation.isActive = true;
+    expect(gate.takeGestureIn(iframe)).toBe(true);
     gate.dispose();
   });
 
@@ -63,11 +93,11 @@ describe('createViewGestureGate', () => {
     clock += ACTIVATION_WINDOW_MS;
 
     other.focus();
-    expect(gate.hasGestureIn(iframe)).toBe(false);
+    expect(gate.takeGestureIn(iframe)).toBe(false);
 
     iframe.focus();
     activation.isActive = false;
-    expect(gate.hasGestureIn(iframe)).toBe(false);
+    expect(gate.takeGestureIn(iframe)).toBe(false);
     gate.dispose();
   });
 
@@ -78,6 +108,6 @@ describe('createViewGestureGate', () => {
     window.dispatchEvent(new Event('keydown'));
     iframe.focus();
 
-    expect(gate.hasGestureIn(iframe)).toBe(true);
+    expect(gate.takeGestureIn(iframe)).toBe(true);
   });
 });

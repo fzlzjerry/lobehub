@@ -54,7 +54,7 @@ vi.mock('./confirm', () => ({ confirmAppMessage, confirmAppToolCall }));
 vi.mock('./toolCallPolicy', () => ({ getAppToolCallPolicy: () => 'confirm' }));
 
 vi.mock('./userGesture', () => ({
-  createViewGestureGate: () => ({ dispose: vi.fn(), hasGestureIn: () => gesture.value }),
+  createViewGestureGate: () => ({ dispose: vi.fn(), takeGestureIn: () => gesture.value }),
 }));
 
 const setup = () => {
@@ -173,6 +173,35 @@ describe('McpAppView', () => {
     });
     expect(invokeMcpToolCall).not.toHaveBeenCalled();
     expect(response(1)?.result.isError).toBe(true);
+  });
+
+  it('refuses a second tool call that needs approval while one is still waiting', async () => {
+    let approveFirst!: (allowed: boolean) => void;
+    confirmAppToolCall.mockReturnValueOnce(new Promise((resolve) => (approveFirst = resolve)));
+    invokeMcpToolCall.mockResolvedValue({ content: 'rainy', success: true });
+    const { fromView, response } = setup();
+    const call = (id: number, city: string) =>
+      fromView({
+        id,
+        method: 'tools/call',
+        params: { arguments: { city }, name: 'get_forecast' },
+      });
+
+    await call(1, 'Rome');
+    await call(2, 'Oslo');
+    // No second modal on top of the first one
+    expect(confirmAppToolCall).toHaveBeenCalledTimes(1);
+    expect(response(2)?.result.isError).toBe(true);
+
+    approveFirst(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(invokeMcpToolCall).toHaveBeenCalledTimes(1);
+    expect(response(1)?.result.isError).toBeFalsy();
+
+    // Once answered, the next call asks again
+    confirmAppToolCall.mockResolvedValueOnce(false);
+    await call(3, 'Lima');
+    expect(confirmAppToolCall).toHaveBeenCalledTimes(2);
   });
 
   it('runs an approved view tool call on this machine for local servers', async () => {

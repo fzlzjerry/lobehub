@@ -17,7 +17,7 @@ import { CollapsedMessage } from './CollapsedMessage';
 import type { GroupChainInput, GroupChainView } from './groupChain';
 import { buildChainView, getChainDurationsMs, getLastBlockCreatedAt } from './groupChain';
 import ProcessFold from './ProcessFold';
-import { renderChainSegment } from './renderChainSegment';
+import { getChainSegmentKey, renderChainSegment } from './renderChainSegment';
 import type { GroupRenderSegment } from './segments';
 import {
   countAssistantLlmCalls,
@@ -184,18 +184,16 @@ const Group = memo<GroupChildrenProps>(
         key={`${view.id}.${variant}`}
         value={contextValues[views.indexOf(view)]!}
       >
-        {/* With lifted views, keyed by the segment's place in the whole turn,
-            not in this slice: folding changes the slice, and a positional key
-            would remount a view that stays on screen. */}
-        {segments.map((segment) =>
-          enableMcpApp ? (
-            <Fragment key={view.segments.indexOf(segment)}>
-              {renderChainSegment(view, segment, renderOptions)}
-            </Fragment>
-          ) : (
-            renderChainSegment(view, segment, renderOptions)
-          ),
-        )}
+        {/* Keyed by the segment's place in the whole turn, not in this slice:
+            folding changes the slice, and a positional key would remount a
+            lifted view that stays on screen. The key does not depend on the
+            mcp_app flag, so flags arriving after the first paint don't remount
+            every segment. */}
+        {segments.map((segment) => (
+          <Fragment key={getChainSegmentKey(view, segment)}>
+            {renderChainSegment(view, segment, renderOptions)}
+          </Fragment>
+        ))}
       </MessageAggregationContext>
     );
 

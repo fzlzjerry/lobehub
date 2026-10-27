@@ -128,6 +128,25 @@ describe('Group with an MCP App view', () => {
     expect(mounts.filter((id) => id === 'step-3')).toHaveLength(1);
   });
 
+  it('does not remount the turn when the mcp_app flag arrives after the first paint', () => {
+    flags.enableMcpApp = false;
+    const plainBlocks = [
+      { content: '', id: 'step-1', tools: [tool('t1', 'search_city')] },
+      { content: 'Paris looks good for a day out.', id: 'step-2' },
+    ] as AssistantContentBlock[];
+    const { rerender } = render(<Group blocks={plainBlocks} id="assistant-1" messageIndex={0} />);
+    expect(mounts).toEqual(['step-1', 'step-2']);
+
+    // Feature flags load; a changed prop lets the memoized group re-render.
+    flags.enableMcpApp = true;
+    rerender(
+      <Group blocks={plainBlocks} disableEditing={false} id="assistant-1" messageIndex={0} />,
+    );
+
+    expect(screen.getAllByTestId('group-item')).toHaveLength(2);
+    expect(mounts).toEqual(['step-1', 'step-2']);
+  });
+
   it('folds the view with the rest of the process while the mcp_app flag is off', () => {
     flags.enableMcpApp = false;
     render(

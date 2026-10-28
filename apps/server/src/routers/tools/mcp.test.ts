@@ -63,6 +63,22 @@ describe('tools mcpRouter.callTool', () => {
 describe('tools mcpRouter.readUiResource', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMcpAppEnabled.mockResolvedValue(true);
+  });
+
+  it('refuses to read a view while the mcp_app flag is off', async () => {
+    mockMcpAppEnabled.mockResolvedValue(false);
+    const caller = mcpRouter.createCaller({ serverDB: {}, userId: 'user-1' } as any);
+
+    await expect(
+      caller.readUiResource({
+        params: { name: 'weather', type: 'http', url: 'https://mcp.example.com/mcp' },
+        uri: 'ui://weather/view.html',
+      }),
+    ).rejects.toHaveProperty('code', 'FORBIDDEN');
+
+    expect(mockMcpAppEnabled).toHaveBeenCalledWith('user-1');
+    expect(mockReadUiResource).not.toHaveBeenCalled();
   });
 
   it('reads the view through the MCP service, credentials in the mutation input', async () => {

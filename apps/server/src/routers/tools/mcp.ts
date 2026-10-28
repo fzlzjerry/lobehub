@@ -2,6 +2,7 @@ import {
   GetStreamableMcpServerManifestInputSchema,
   StreamableHTTPAuthSchema,
 } from '@lobechat/types';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import {
@@ -112,10 +113,16 @@ export const mcpRouter = router({
    * Read an MCP Apps `ui://` resource so the chat can render a tool result's
    * interactive view. A mutation, though it only reads: the params carry the
    * plugin's auth and headers, which must travel in a POST body, not a GET URL.
+   * Refused while the `mcp_app` flag is off, since the read opens a session
+   * that advertises MCP Apps.
    */
   readUiResource: mcpProcedure
     .input(z.object({ params: mcpClientParamsSchema, uri: z.string().startsWith('ui://') }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      if (!(await isMcpAppEnabled(ctx.userId))) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Interactive views are turned off' });
+      }
+
       return await mcpService.readUiResource(input.params, input.uri);
     }),
 

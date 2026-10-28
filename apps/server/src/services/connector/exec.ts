@@ -127,12 +127,18 @@ export const callConnectorToolById = async (
 /**
  * Read an MCP Apps `ui://` resource from a connector's server, so the chat can
  * render a connector tool result's interactive view. Same connector checks as
- * {@link callConnectorToolById}, minus the per-tool ones.
+ * {@link callConnectorToolById}, minus the per-tool ones. Refused while the
+ * `mcp_app` flag is off, since the read opens a session that advertises MCP Apps.
  */
 export const readConnectorUiResourceById = async (
   params: { agentId?: string; identifier: string; uri: string },
-  ctx: ConnectorToolSyncContext,
+  /** `userId` decides the caller's `mcp_app` flag: whether views may be read at all. */
+  ctx: ConnectorToolSyncContext & { userId?: string | null },
 ) => {
+  if (!(await isMcpAppEnabled(ctx.userId))) {
+    throw new ConnectorToolCallError('FORBIDDEN', 'Interactive views are turned off');
+  }
+
   const [connector] = await findConnector(params, ctx);
   if (!connector) {
     throw new ConnectorToolCallError('NOT_FOUND', 'Connector not found');

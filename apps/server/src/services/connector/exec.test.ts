@@ -51,6 +51,7 @@ const makeCtx = (connectors: any[], tools: any[]) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mcpAppEnabled.mockResolvedValue(false);
   vi.mocked(ensureFreshConnectorToken).mockImplementation(async (c: any) => c);
   (deviceGateway as any).isConfigured = false;
 });
@@ -230,6 +231,23 @@ describe('callConnectorToolById', () => {
 });
 
 describe('readConnectorUiResourceById', () => {
+  beforeEach(() => {
+    mcpAppEnabled.mockResolvedValue(true);
+  });
+
+  it('refuses to read a view while the mcp_app flag is off', async () => {
+    mcpAppEnabled.mockResolvedValue(false);
+    const ctx = { ...makeCtx([connector], []), userId: 'user-1' };
+
+    await expect(
+      readConnectorUiResourceById({ identifier: 'my-conn', uri: 'ui://app' }, ctx),
+    ).rejects.toHaveProperty('code', 'FORBIDDEN');
+
+    expect(mcpAppEnabled).toHaveBeenCalledWith('user-1');
+    expect(ensureFreshConnectorToken).not.toHaveBeenCalled();
+    expect(mcpService.readUiResource).not.toHaveBeenCalled();
+  });
+
   it('reads the resource with the connector credentials', async () => {
     vi.mocked(mcpService.readUiResource).mockResolvedValue({ contents: [] } as any);
     const ctx = makeCtx([connector], []);

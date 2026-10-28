@@ -884,7 +884,7 @@
   "mcpApp.toolCall.confirm.ok": "允许",
   "mcpApp.toolCall.confirm.title": "允许运行这个工具吗？",
   "mcpApp.toolCall.rejected": "工具「{{tool}}」没有运行：这个页面不能调用它，或者你没有允许。",
-  "mcpApp.waitingApproval": "这个页面正在等你审批…",
+  "mcpApp.waitingApproval": "正在等待你的审批…",
   "mcpEmpty.deployment": "暂无部署选项",
   "mcpEmpty.prompts": "该技能暂无提示词",
   "mcpEmpty.resources": "该技能暂无资源",

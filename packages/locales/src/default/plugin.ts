@@ -908,7 +908,7 @@ export default {
   'mcpApp.toolCall.confirm.title': 'Allow this tool to run?',
   'mcpApp.toolCall.rejected':
     'The tool "{{tool}}" was not run: it is not available to this view or was not approved.',
-  'mcpApp.waitingApproval': 'This view is waiting for your approval…',
+  'mcpApp.waitingApproval': 'Waiting for your approval…',
   'mcpEmpty.deployment': 'No deployment options',
   'mcpEmpty.prompts': 'No prompts',
   'mcpEmpty.resources': 'No resources',

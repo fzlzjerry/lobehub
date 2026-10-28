@@ -82,4 +82,19 @@ describe('MCP App confirm queue', () => {
     opened[1].onOpenChange(false);
     await next;
   });
+
+  it('leaves no abort listener on the signal once a request is answered', async () => {
+    const view = new AbortController();
+    const added = vi.spyOn(view.signal, 'addEventListener');
+    const removed = vi.spyOn(view.signal, 'removeEventListener');
+
+    const pending = toolCall(view.signal);
+    await flush();
+    opened[0].onOpenChange(false);
+    await expect(pending).resolves.toBe(false);
+
+    const listeners = (spy: typeof added) => spy.mock.calls.map(([, listener]) => listener);
+    expect(listeners(added).length).toBeGreaterThan(0);
+    expect(listeners(removed)).toEqual(expect.arrayContaining(listeners(added)));
+  });
 });

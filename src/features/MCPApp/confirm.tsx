@@ -58,14 +58,15 @@ const confirm = (options: ConfirmOptions) => {
 
   const { signal } = options;
   if (!signal) return turn;
+  if (signal.aborted) return Promise.resolve(false);
 
-  return Promise.race([
-    turn,
-    new Promise<boolean>((resolve) => {
-      if (signal.aborted) resolve(false);
-      else signal.addEventListener('abort', () => resolve(false), { once: true });
-    }),
-  ]);
+  const dropped = Promise.withResolvers<boolean>();
+  const onAbort = () => dropped.resolve(false);
+  signal.addEventListener('abort', onAbort, { once: true });
+  // The signal can outlive many requests, so don't leave a listener per answer
+  return Promise.race([turn, dropped.promise]).finally(() =>
+    signal.removeEventListener('abort', onAbort),
+  );
 };
 
 /** Ask before a view runs a tool, showing the app by name and the arguments it passes. */

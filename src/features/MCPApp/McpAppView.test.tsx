@@ -92,6 +92,20 @@ const setup = () => {
   return { fromView, iframe, message, response };
 };
 
+const setupToolCalls = () => {
+  const view = setup();
+  const call = (id: number, city: string) =>
+    view.fromView({
+      id,
+      method: 'tools/call',
+      params: { arguments: { city }, name: 'get_forecast' },
+    });
+
+  return { ...view, call };
+};
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe('McpAppView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -134,6 +148,7 @@ describe('McpAppView', () => {
 
     expect(confirmAppMessage).toHaveBeenCalledWith({
       appName: 'Weather Demo',
+      signal: expect.any(AbortSignal),
       text: 'Posted on load',
     });
     expect(sendMessage).not.toHaveBeenCalled();
@@ -169,39 +184,66 @@ describe('McpAppView', () => {
     expect(confirmAppToolCall).toHaveBeenCalledWith({
       appName: 'Weather Demo',
       args: { city: 'Rome' },
+      signal: expect.any(AbortSignal),
       tool: 'get_forecast',
     });
     expect(invokeMcpToolCall).not.toHaveBeenCalled();
     expect(response(1)?.result.isError).toBe(true);
   });
 
-  it('refuses a second tool call that needs approval while one is still waiting', async () => {
-    let approveFirst!: (allowed: boolean) => void;
-    confirmAppToolCall.mockReturnValueOnce(new Promise((resolve) => (approveFirst = resolve)));
+  it('asks about parallel tool calls in turn instead of refusing the later ones', async () => {
+    const answers: ((allowed: boolean) => void)[] = [];
+    confirmAppToolCall.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
     invokeMcpToolCall.mockResolvedValue({ content: 'rainy', success: true });
-    const { fromView, response } = setup();
-    const call = (id: number, city: string) =>
-      fromView({
-        id,
-        method: 'tools/call',
-        params: { arguments: { city }, name: 'get_forecast' },
-      });
+    const { call, response } = setupToolCalls();
 
     await call(1, 'Rome');
     await call(2, 'Oslo');
-    // No second modal on top of the first one
-    expect(confirmAppToolCall).toHaveBeenCalledTimes(1);
-    expect(response(2)?.result.isError).toBe(true);
+    // Both wait for an answer; the confirm queue shows their modals one at a time
+    expect(confirmAppToolCall).toHaveBeenCalledTimes(2);
+    expect(response(2)).toBeUndefined();
 
-    approveFirst(true);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    answers[0](true);
+    answers[1](false);
+    await flush();
     expect(invokeMcpToolCall).toHaveBeenCalledTimes(1);
     expect(response(1)?.result.isError).toBeFalsy();
+    expect(response(2)?.result).toMatchObject({
+      content: [{ text: 'mcpApp.toolCall.rejected' }],
+      isError: true,
+    });
+  });
 
-    // Once answered, the next call asks again
-    confirmAppToolCall.mockResolvedValueOnce(false);
-    await call(3, 'Lima');
-    expect(confirmAppToolCall).toHaveBeenCalledTimes(2);
+  it('refuses tool calls as busy, not denied, once too many wait for approval', async () => {
+    const answers: ((allowed: boolean) => void)[] = [];
+    confirmAppToolCall.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+    const { call, response } = setupToolCalls();
+
+    for (const id of [1, 2, 3, 4]) await call(id, 'Rome');
+
+    expect(confirmAppToolCall).toHaveBeenCalledTimes(3);
+    expect(response(4)?.result).toMatchObject({
+      content: [{ text: 'mcpApp.toolCall.busy' }],
+      isError: true,
+    });
+
+    // Answering one frees a slot
+    answers[0](false);
+    await flush();
+    await call(5, 'Rome');
+    expect(confirmAppToolCall).toHaveBeenCalledTimes(4);
+  });
+
+  it('withdraws its pending approvals when the view goes away', async () => {
+    confirmAppToolCall.mockReturnValue(new Promise(() => {}));
+    const { call } = setupToolCalls();
+
+    await call(1, 'Rome');
+    const { signal } = confirmAppToolCall.mock.calls[0][0] as { signal: AbortSignal };
+    expect(signal.aborted).toBe(false);
+
+    cleanup();
+    expect(signal.aborted).toBe(true);
   });
 
   it('runs an approved view tool call on this machine for local servers', async () => {

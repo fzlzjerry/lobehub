@@ -32,6 +32,8 @@ import {
 
 const DEFAULT_HEIGHT = 320;
 const MAX_HEIGHT = 2000;
+// Tool calls from one view that may wait for approval at once; more are refused as busy
+const MAX_PENDING_TOOL_APPROVALS = 3;
 
 const styles = stylex.create({
   bordered: {
@@ -108,8 +110,11 @@ const McpAppView = memo<McpAppViewProps>(
       const gestures = createViewGestureGate();
       // One message at a time, so a view can't line up runs behind a pending one
       let sending = false;
-      // One approval at a time, so a view can't stack modals on top of each other
-      let confirmingToolCall = false;
+      // Approvals queue up and open one at a time; a few per view, so a view
+      // can't bury the user under modals
+      let pendingToolApprovals = 0;
+      // Drops this view's approvals, waiting or shown, once it goes away
+      const approvals = new AbortController();
 
       const { bridge, dispose } = connectMcpAppBridge(target, {
         // Views may only call tools on the server that rendered them, and
@@ -121,17 +126,24 @@ const McpAppView = memo<McpAppViewProps>(
             toolArgs,
           });
           let allowed = policy === 'allow';
-          // A call that needs approval while another one waits for it is refused
-          if (policy === 'confirm' && !confirmingToolCall) {
-            confirmingToolCall = true;
+          if (policy === 'confirm') {
+            if (pendingToolApprovals >= MAX_PENDING_TOOL_APPROVALS) {
+              return {
+                content: [{ text: tr('mcpApp.toolCall.busy', { tool: name }), type: 'text' }],
+                isError: true,
+              };
+            }
+
+            pendingToolApprovals += 1;
             try {
               allowed = await confirmAppToolCall({
                 appName: getAppName(currentIdentifier, currentAgentId),
                 args: toolArgs,
+                signal: approvals.signal,
                 tool: name,
               });
             } finally {
-              confirmingToolCall = false;
+              pendingToolApprovals -= 1;
             }
           }
 
@@ -172,6 +184,7 @@ const McpAppView = memo<McpAppViewProps>(
               !fromUser &&
               !(await confirmAppMessage({
                 appName: getAppName(currentIdentifier, currentAgentId),
+                signal: approvals.signal,
                 text,
               }))
             ) {
@@ -194,6 +207,7 @@ const McpAppView = memo<McpAppViewProps>(
 
       return () => {
         bridgeRef.current = undefined;
+        approvals.abort();
         gestures.dispose();
         dispose();
       };

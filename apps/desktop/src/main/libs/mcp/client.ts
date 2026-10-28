@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { Readable } from 'node:stream';
 
+import { toRecord } from '@lobechat/utils/object';
 import type { Progress, Transport } from '@modelcontextprotocol/client';
 import {
   Client,
@@ -364,13 +365,16 @@ export class MCPClient {
   constructor(params: MCPClientParams) {
     this.mcp = new Client(
       { name: 'lobehub-desktop-mcp-client', version: '1.0.0' },
-      // Advertise MCP Apps (SEP-1865) so servers expose their interactive views.
       {
+        // Advertise MCP Apps (SEP-1865) so servers expose their interactive views.
         capabilities: {
           extensions: {
             'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] },
           },
         },
+        // Do not add a probe subprocess/timeout to stdio installations or calls.
+        versionNegotiation: { mode: params.type === 'http' ? 'auto' : 'legacy' },
+        inputRequired: { autoFulfill: false },
       },
     );
 
@@ -723,6 +727,10 @@ export class MCPClient {
     await this.mcp.close();
   }
 
+  getProtocolEra() {
+    return this.mcp.getProtocolEra();
+  }
+
   async listTools() {
     const { tools } = await this.mcp.listTools();
     this.uiResourceUris = new Map(
@@ -784,12 +792,31 @@ export class MCPClient {
   }
 
   async callTool(toolName: string, args: any): Promise<ToolCallResult> {
-    const result = await this.mcp.callTool(
-      { arguments: args, name: toolName },
-      {
-        timeout: getDesktopEnv().MCP_TOOL_TIMEOUT,
-      },
-    );
-    return result as ToolCallResult;
+    try {
+      const result = await this.mcp.callTool(
+        { arguments: args, name: toolName },
+        {
+          timeout: getDesktopEnv().MCP_TOOL_TIMEOUT,
+        },
+      );
+      return result as ToolCallResult;
+    } catch (error) {
+      if (
+        SdkError.isInstance(error) &&
+        error.code === SdkErrorCode.UnsupportedResultType &&
+        toRecord(error.data)?.resultType === 'input_required'
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'This MCP tool requires user input that LobeHub does not support yet. Use a tool that does not require additional input.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      throw error;
+    }
   }
 }

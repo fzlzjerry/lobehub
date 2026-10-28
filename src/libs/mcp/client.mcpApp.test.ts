@@ -11,6 +11,7 @@ const { clientOptions, listTools } = vi.hoisted(() => ({
 vi.mock('@modelcontextprotocol/client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   Client: class {
+    getProtocolEra = () => 'legacy';
     listTools = listTools;
     constructor(_info: unknown, options?: unknown) {
       clientOptions.push(options);
@@ -35,11 +36,9 @@ describe('MCPClient MCP Apps capability', () => {
     new MCPClient(params, { mcpApp: false });
     new MCPClient(params, { mcpApp: true });
 
-    expect(clientOptions).toEqual([
-      undefined,
-      undefined,
-      { capabilities: MCP_APP_CLIENT_CAPABILITIES },
-    ]);
+    expect(
+      clientOptions.map((options) => (options as { capabilities?: unknown }).capabilities),
+    ).toEqual([undefined, undefined, MCP_APP_CLIENT_CAPABILITIES]);
   });
 });
 

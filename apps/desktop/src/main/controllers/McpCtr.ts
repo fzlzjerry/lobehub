@@ -6,6 +6,7 @@ import {
   type McpIpcPayload,
   serializeMcpIpcPayload,
 } from '@lobechat/utils/mcpIpcPayload';
+import { getMcpServerDescription } from '@lobechat/utils/mcpServerDescription';
 
 import FileService from '@/services/fileSrv';
 import { createLogger } from '@/utils/logger';
@@ -538,13 +539,7 @@ export default class McpCtr extends ControllerModule {
         identifier,
         meta: {
           avatar: input.metadata?.avatar || 'MCP_AVATAR',
-          description:
-            input.metadata?.description ||
-            `${identifier} MCP server has ` +
-              Object.entries(manifest)
-                .filter(([key]) => ['tools', 'prompts', 'resources'].includes(key))
-                .map(([key, item]) => `${(item as Array<any>)?.length} ${key}`)
-                .join(','),
+          description: input.metadata?.description || getMcpServerDescription(identifier, manifest),
           title: input.metadata?.name || identifier,
         },
         ...manifest,
@@ -607,7 +602,7 @@ export default class McpCtr extends ControllerModule {
           avatar: input.metadata?.avatar || 'MCP_AVATAR',
           description:
             input.metadata?.description ||
-            `${identifier} MCP server has ${tools.length} tools, like "${tools[0]?.name}"`,
+            getMcpServerDescription(identifier, { tools }, { includeToolExample: true }),
           title: identifier,
         },
         type: 'mcp' as any,
@@ -771,7 +766,12 @@ export default class McpCtr extends ControllerModule {
               // MCP Apps: the `ui://` resource the chat renders this result with
               ...(uiResourceUri && !raw.isError && { mcpApp: { resourceUri: uiResourceUri } }),
             };
-            return { content, state, success: true };
+            return {
+              content,
+              ...(raw.isError ? { error: { message: content, name: 'MCPToolError' } } : {}),
+              state,
+              success: raw.isError !== true,
+            };
           } catch (error) {
             throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
               ranOnClient: client,
@@ -783,7 +783,7 @@ export default class McpCtr extends ControllerModule {
         return await runOn(await this.acquireClient(params));
       } catch (firstError) {
         const failedClient = (firstError as { ranOnClient?: MCPClient })?.ranOnClient;
-        if (!isStaleSessionError(firstError)) {
+        if (!isStaleSessionError(firstError, failedClient?.getProtocolEra())) {
           // A dead stdio subprocess must still be evicted even though the
           // failed call is NOT replayed: the request may have reached the
           // server before the pipe died, so re-running a mutating tool
@@ -823,7 +823,10 @@ export default class McpCtr extends ControllerModule {
           // post-processing failure after a SUCCESSFUL tool call is not a
           // session problem — the tool already ran, so the healthy
           // replacement stays pooled.
-          if (isStaleSessionError(retryError) || isDeadTransportError(retryError)) {
+          if (
+            isStaleSessionError(retryError, retryClient.getProtocolEra()) ||
+            isDeadTransportError(retryError)
+          ) {
             await this.evictClient(params, retryClient);
           }
           throw retryError;

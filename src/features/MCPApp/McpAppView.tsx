@@ -16,6 +16,7 @@ import { mcpAppKeys } from '@/libs/swr/keys';
 import { mcpService } from '@/services/mcp';
 import { getToolStoreState } from '@/store/tool';
 
+import { anySignal } from './abortSignal';
 import { mcpAppNameSelector } from './appName';
 import { buildHostContext, connectMcpAppBridge } from './bridge';
 import { confirmAppMessage, confirmAppToolCall } from './confirm';
@@ -117,16 +118,20 @@ const McpAppView = memo<McpAppViewProps>(
       let pendingToolApprovals = 0;
       // Drops this view's approvals, waiting or shown, once it goes away
       const approvals = new AbortController();
-      // An approval also lapses once the view stops waiting for its request (it
-      // timed out behind other modals): answering it would run work nobody reads
-      const approvalSignal = (request: AbortSignal) => AbortSignal.any([approvals.signal, request]);
       // The view can't see the modal its request waits for, possibly behind
       // another view's, so say under it that it's waiting rather than hung
-      const awaitApproval = async (ask: Promise<boolean>) => {
+      const awaitApproval = async (
+        request: AbortSignal,
+        ask: (signal: AbortSignal) => Promise<boolean>,
+      ) => {
+        // An approval also lapses once the view stops waiting for its request (it
+        // timed out behind other modals): answering it would run work nobody reads
+        const { dispose, signal } = anySignal([approvals.signal, request]);
         setWaitingApprovals((count) => count + 1);
         try {
-          return await ask;
+          return await ask(signal);
         } finally {
+          dispose();
           setWaitingApprovals((count) => count - 1);
         }
       };
@@ -151,11 +156,11 @@ const McpAppView = memo<McpAppViewProps>(
 
             pendingToolApprovals += 1;
             try {
-              allowed = await awaitApproval(
+              allowed = await awaitApproval(request, (signal) =>
                 confirmAppToolCall({
                   appName: getAppName(currentIdentifier, currentAgentId),
                   args: toolArgs,
-                  signal: approvalSignal(request),
+                  signal,
                   tool: name,
                 }),
               );
@@ -199,10 +204,10 @@ const McpAppView = memo<McpAppViewProps>(
             const { agentId: currentAgentId, identifier: currentIdentifier } = latest.current;
             if (
               !fromUser &&
-              !(await awaitApproval(
+              !(await awaitApproval(request, (signal) =>
                 confirmAppMessage({
                   appName: getAppName(currentIdentifier, currentAgentId),
-                  signal: approvalSignal(request),
+                  signal,
                   text,
                 }),
               ))

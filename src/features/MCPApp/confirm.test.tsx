@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { confirmAppMessage, confirmAppToolCall } from './confirm';
 
@@ -33,6 +33,10 @@ describe('MCP App confirm queue', () => {
   beforeEach(() => {
     opened.length = 0;
     createModal.mockClear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('opens one modal at a time across views', async () => {
@@ -81,6 +85,20 @@ describe('MCP App confirm queue', () => {
     expect(opened).toHaveLength(2);
     opened[1].onOpenChange(false);
     await next;
+  });
+
+  it('asks with a signal in browsers without Promise.withResolvers', async () => {
+    vi.spyOn(Promise, 'withResolvers').mockImplementation(() => {
+      throw new TypeError('Promise.withResolvers is not a function');
+    });
+    const view = new AbortController();
+
+    const pending = toolCall(view.signal);
+    await flush();
+    expect(opened).toHaveLength(1);
+
+    opened[0].onOpenChange(false);
+    await expect(pending).resolves.toBe(false);
   });
 
   it('leaves no abort listener on the signal once a request is answered', async () => {

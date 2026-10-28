@@ -114,6 +114,7 @@ describe('McpAppView', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('keeps powerful features off whatever permissions the view declares', () => {
@@ -277,6 +278,22 @@ describe('McpAppView', () => {
     expect(messageSignal.aborted).toBe(true);
     expect(invokeMcpToolCall).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('asks for approval, and drops it on cancel, in browsers without AbortSignal.any', async () => {
+    vi.spyOn(AbortSignal, 'any').mockImplementation(() => {
+      throw new TypeError('AbortSignal.any is not a function');
+    });
+    confirmAppToolCall.mockReturnValue(new Promise(() => {}));
+    const { call, fromView } = setupToolCalls();
+
+    await call(1, 'Rome');
+    expect(confirmAppToolCall).toHaveBeenCalledTimes(1);
+    const { signal } = confirmAppToolCall.mock.calls[0][0] as { signal: AbortSignal };
+    expect(signal.aborted).toBe(false);
+
+    await fromView({ method: 'notifications/cancelled', params: { requestId: 1 } });
+    expect(signal.aborted).toBe(true);
   });
 
   it('says under the view that it is waiting while its approval is unanswered', async () => {

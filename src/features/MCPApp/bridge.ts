@@ -17,12 +17,22 @@ export const buildHostContext = (isDark: boolean): McpUiHostContext => ({
 });
 
 export interface McpAppBridgeHost {
-  /** Call a tool on the server that rendered the view. */
-  callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>;
+  /**
+   * Call a tool on the server that rendered the view. `signal` aborts when the
+   * view stops waiting for the answer (it timed out or cancelled the request).
+   */
+  callTool: (
+    name: string,
+    args: Record<string, unknown>,
+    signal: AbortSignal,
+  ) => Promise<CallToolResult>;
   hostContext: McpUiHostContext;
   onSizeChange: (height: number) => void;
-  /** Post a user message into the conversation; resolves `false` when the host declined it. */
-  sendMessage: (text: string) => Promise<boolean | void> | boolean | void;
+  /**
+   * Post a user message into the conversation; resolves `false` when the host
+   * declined it. `signal` aborts when the view stops waiting for the answer.
+   */
+  sendMessage: (text: string, signal: AbortSignal) => Promise<boolean | void> | boolean | void;
   toolInput: () => Record<string, unknown>;
   toolResult: () => CallToolResult;
 }
@@ -39,16 +49,17 @@ export const connectMcpAppBridge = (target: Window, host: McpAppBridgeHost) => {
     { hostContext: host.hostContext },
   );
 
-  bridge.oncalltool = ({ arguments: args, name }) => host.callTool(name, args ?? {});
+  bridge.oncalltool = ({ arguments: args, name }, { mcpReq }) =>
+    host.callTool(name, args ?? {}, mcpReq.signal);
 
-  bridge.onmessage = async ({ content }) => {
+  bridge.onmessage = async ({ content }, { mcpReq }) => {
     const text = content
       .flatMap((block) => (block.type === 'text' ? [block.text] : []))
       .join('\n')
       .trim();
     if (!text) return { isError: true };
 
-    const sent = await host.sendMessage(text);
+    const sent = await host.sendMessage(text, mcpReq.signal);
     return sent === false ? { isError: true } : {};
   };
 

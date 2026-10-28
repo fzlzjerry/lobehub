@@ -246,6 +246,39 @@ describe('McpAppView', () => {
     expect(signal.aborted).toBe(true);
   });
 
+  it('drops an approval once the view stops waiting for that request', async () => {
+    // Like the real confirm: an aborted approval resolves `false`, whatever the user clicks later
+    const settle = ({ signal }: { signal: AbortSignal }) =>
+      new Promise<boolean>((resolve) =>
+        signal.addEventListener('abort', () => resolve(false), { once: true }),
+      );
+    confirmAppToolCall.mockImplementation(settle);
+    confirmAppMessage.mockImplementation(settle);
+    const { call, fromView, message } = setupToolCalls();
+    const cancel = (requestId: number) =>
+      fromView({ method: 'notifications/cancelled', params: { reason: 'timeout', requestId } });
+
+    await call(1, 'Rome');
+    await call(2, 'Oslo');
+    await message(3, 'Posted on load');
+    const [first, second] = confirmAppToolCall.mock.calls.map(
+      ([options]) => (options as { signal: AbortSignal }).signal,
+    );
+    const { signal: messageSignal } = confirmAppMessage.mock.calls[0][0] as {
+      signal: AbortSignal;
+    };
+
+    // The view timed out on its first call and on the message
+    await cancel(1);
+    await cancel(3);
+
+    expect(first.aborted).toBe(true);
+    expect(second.aborted).toBe(false);
+    expect(messageSignal.aborted).toBe(true);
+    expect(invokeMcpToolCall).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
   it('runs an approved view tool call on this machine for local servers', async () => {
     confirmAppToolCall.mockResolvedValue(true);
     invokeMcpToolCall.mockResolvedValue({ content: 'rainy', success: true });

@@ -70,7 +70,11 @@ describe('connectMcpAppBridge', () => {
       method: 'tools/call',
       params: { arguments: { city: 'Rome' }, name: 'get_forecast' },
     });
-    expect(host.callTool).toHaveBeenCalledWith('get_forecast', { city: 'Rome' });
+    expect(host.callTool).toHaveBeenCalledWith(
+      'get_forecast',
+      { city: 'Rome' },
+      expect.any(AbortSignal),
+    );
     expect(response(2)?.result).toEqual({ content: [{ text: 'rainy', type: 'text' }] });
 
     await fromView({
@@ -78,8 +82,28 @@ describe('connectMcpAppBridge', () => {
       method: 'ui/message',
       params: { content: [{ text: 'Plan a trip to Rome', type: 'text' }], role: 'user' },
     });
-    expect(host.sendMessage).toHaveBeenCalledWith('Plan a trip to Rome');
+    expect(host.sendMessage).toHaveBeenCalledWith('Plan a trip to Rome', expect.any(AbortSignal));
     expect(response(3)?.result).toEqual({});
+  });
+
+  it('aborts a request signal once the view cancels that request', async () => {
+    const { fromView, host } = setup({ callTool: vi.fn(() => new Promise<never>(() => {})) });
+    await fromView({ method: 'ui/notifications/initialized' });
+
+    await fromView({
+      id: 7,
+      method: 'tools/call',
+      params: { arguments: {}, name: 'get_forecast' },
+    });
+    const signal = vi.mocked(host.callTool).mock.calls[0][2];
+    expect(signal.aborted).toBe(false);
+
+    // What the view sends when its request times out
+    await fromView({
+      method: 'notifications/cancelled',
+      params: { reason: 'timeout', requestId: 7 },
+    });
+    expect(signal.aborted).toBe(true);
   });
 
   it('answers a message the host declined with an error', async () => {

@@ -115,11 +115,14 @@ const McpAppView = memo<McpAppViewProps>(
       let pendingToolApprovals = 0;
       // Drops this view's approvals, waiting or shown, once it goes away
       const approvals = new AbortController();
+      // An approval also lapses once the view stops waiting for its request (it
+      // timed out behind other modals): answering it would run work nobody reads
+      const approvalSignal = (request: AbortSignal) => AbortSignal.any([approvals.signal, request]);
 
       const { bridge, dispose } = connectMcpAppBridge(target, {
         // Views may only call tools on the server that rendered them, and
         // under the same approval rules as the conversation.
-        callTool: async (name, toolArgs) => {
+        callTool: async (name, toolArgs, request) => {
           const { agentId: currentAgentId, identifier: currentIdentifier, t: tr } = latest.current;
           const policy = getAppToolCallPolicy(currentIdentifier, name, {
             agentId: currentAgentId,
@@ -139,7 +142,7 @@ const McpAppView = memo<McpAppViewProps>(
               allowed = await confirmAppToolCall({
                 appName: getAppName(currentIdentifier, currentAgentId),
                 args: toolArgs,
-                signal: approvals.signal,
+                signal: approvalSignal(request),
                 tool: name,
               });
             } finally {
@@ -173,7 +176,7 @@ const McpAppView = memo<McpAppViewProps>(
         // A message starts a billed run, and a view can post one on load (every
         // time the topic reopens). Without a fresh gesture in the view just
         // before, the user confirms it first. One gesture covers one message.
-        sendMessage: async (text) => {
+        sendMessage: async (text, request) => {
           if (sending) return false;
           // Read before anything async: the activation expires
           const fromUser = gestures.takeGestureIn(iframe);
@@ -184,7 +187,7 @@ const McpAppView = memo<McpAppViewProps>(
               !fromUser &&
               !(await confirmAppMessage({
                 appName: getAppName(currentIdentifier, currentAgentId),
-                signal: approvals.signal,
+                signal: approvalSignal(request),
                 text,
               }))
             ) {

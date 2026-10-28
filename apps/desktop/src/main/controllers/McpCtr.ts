@@ -624,6 +624,9 @@ export default class McpCtr extends ControllerModule {
   /**
    * Read an MCP Apps `ui://` resource from a stdio or local-network HTTP
    * server, so the chat can render a tool result's interactive view.
+   *
+   * Unlike the web routes, not gated by the `mcp_app` flag: the main process
+   * has no per-user flags, and the renderer only asks while the flag is on.
    */
   @IpcMethod()
   async readUiResource(payload: SuperJSONSerialized<ReadUiResourceInput>) {

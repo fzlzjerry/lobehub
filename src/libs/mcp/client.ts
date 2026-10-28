@@ -30,6 +30,8 @@ const MCP_TOOL_TIMEOUT = (() => {
   const val = Number(process.env.MCP_TOOL_TIMEOUT);
   return Number.isFinite(val) && val > 0 ? val : 60_000;
 })();
+// How long a failed tool listing counts as "no views" before the next result lists again
+const UI_RESOURCE_LIST_RETRY_MS = 60_000;
 
 /**
  * Pre-check stdio command to capture detailed error information
@@ -178,6 +180,8 @@ export class MCPClient {
   private params: MCPClientParams;
   /** tool name → `ui://` resource URI, filled from the last successful `listTools` */
   private uiResourceUris?: Map<string, string>;
+  /** When the last `getToolUiResourceUri` listing failed, while no listing has succeeded */
+  private uiResourceListFailedAt?: number;
 
   constructor(params: MCPClientParams, { mcpApp = false }: MCPClientOptions = {}) {
     this.params = params;
@@ -430,16 +434,21 @@ export class MCPClient {
   /**
    * The MCP Apps `ui://` resource a tool renders its result with, if any.
    * Lists tools once per client to learn it. A failed listing counts as "no
-   * views" instead of being retried on every call; a later successful
-   * `listTools` on this client (a manifest refresh) fills the map again.
+   * views" for `UI_RESOURCE_LIST_RETRY_MS` instead of being retried on every
+   * call, then the next call lists again. On the server nothing else refreshes
+   * the map: manifests are listed on a separate client without MCP Apps.
    */
   async getToolUiResourceUri(toolName: string): Promise<string | undefined> {
-    if (!this.uiResourceUris) {
+    const failedAt = this.uiResourceListFailedAt;
+    if (
+      !this.uiResourceUris &&
+      (failedAt === undefined || Date.now() - failedAt >= UI_RESOURCE_LIST_RETRY_MS)
+    ) {
       await this.listTools();
-      this.uiResourceUris ??= new Map();
+      this.uiResourceListFailedAt = this.uiResourceUris ? undefined : Date.now();
     }
 
-    return this.uiResourceUris.get(toolName);
+    return this.uiResourceUris?.get(toolName);
   }
 
   async readResource(uri: string) {

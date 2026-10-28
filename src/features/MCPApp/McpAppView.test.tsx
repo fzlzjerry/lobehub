@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import McpAppView from './McpAppView';
@@ -277,6 +277,25 @@ describe('McpAppView', () => {
     expect(messageSignal.aborted).toBe(true);
     expect(invokeMcpToolCall).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('says under the view that it is waiting while its approval is unanswered', async () => {
+    const answers: ((allowed: boolean) => void)[] = [];
+    confirmAppToolCall.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+    const { call } = setupToolCalls();
+    expect(screen.queryByText('mcpApp.waitingApproval')).toBeNull();
+
+    await call(1, 'Rome');
+    await call(2, 'Oslo');
+    expect(await screen.findByText('mcpApp.waitingApproval')).toBeTruthy();
+
+    // Still waiting while the second one is unanswered
+    answers[0](false);
+    await flush();
+    expect(screen.getByText('mcpApp.waitingApproval')).toBeTruthy();
+
+    answers[1](false);
+    await waitFor(() => expect(screen.queryByText('mcpApp.waitingApproval')).toBeNull());
   });
 
   it('runs an approved view tool call on this machine for local servers', async () => {

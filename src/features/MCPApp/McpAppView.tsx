@@ -1,7 +1,7 @@
 'use client';
 
 import { safeParseJSON } from '@lobechat/utils';
-import { Skeleton } from '@lobehub/ui';
+import { Flexbox, Skeleton, Spin, Text } from '@lobehub/ui';
 import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 import { type AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge';
 import * as stylex from '@stylexjs/stylex';
@@ -80,6 +80,8 @@ const McpAppView = memo<McpAppViewProps>(
   ({ apiName, arguments: args, fallback, identifier, resourceUri, result, toolCallId }) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [height, setHeight] = useState(DEFAULT_HEIGHT);
+    // This view's requests still waiting for the user's answer
+    const [waitingApprovals, setWaitingApprovals] = useState(0);
     const isDark = useIsDark();
     const sendMessage = useConversationStore((s) => s.sendMessage);
     const agentId = useConversationStore((s) => s.context.agentId) || undefined;
@@ -118,6 +120,16 @@ const McpAppView = memo<McpAppViewProps>(
       // An approval also lapses once the view stops waiting for its request (it
       // timed out behind other modals): answering it would run work nobody reads
       const approvalSignal = (request: AbortSignal) => AbortSignal.any([approvals.signal, request]);
+      // The view can't see the modal its request waits for, possibly behind
+      // another view's, so say under it that it's waiting rather than hung
+      const awaitApproval = async (ask: Promise<boolean>) => {
+        setWaitingApprovals((count) => count + 1);
+        try {
+          return await ask;
+        } finally {
+          setWaitingApprovals((count) => count - 1);
+        }
+      };
 
       const { bridge, dispose } = connectMcpAppBridge(target, {
         // Views may only call tools on the server that rendered them, and
@@ -139,12 +151,14 @@ const McpAppView = memo<McpAppViewProps>(
 
             pendingToolApprovals += 1;
             try {
-              allowed = await confirmAppToolCall({
-                appName: getAppName(currentIdentifier, currentAgentId),
-                args: toolArgs,
-                signal: approvalSignal(request),
-                tool: name,
-              });
+              allowed = await awaitApproval(
+                confirmAppToolCall({
+                  appName: getAppName(currentIdentifier, currentAgentId),
+                  args: toolArgs,
+                  signal: approvalSignal(request),
+                  tool: name,
+                }),
+              );
             } finally {
               pendingToolApprovals -= 1;
             }
@@ -185,11 +199,13 @@ const McpAppView = memo<McpAppViewProps>(
             const { agentId: currentAgentId, identifier: currentIdentifier } = latest.current;
             if (
               !fromUser &&
-              !(await confirmAppMessage({
-                appName: getAppName(currentIdentifier, currentAgentId),
-                signal: approvalSignal(request),
-                text,
-              }))
+              !(await awaitApproval(
+                confirmAppMessage({
+                  appName: getAppName(currentIdentifier, currentAgentId),
+                  signal: approvalSignal(request),
+                  text,
+                }),
+              ))
             ) {
               return false;
             }
@@ -228,18 +244,28 @@ const McpAppView = memo<McpAppViewProps>(
     }
 
     return (
-      <div {...stylex.props(resource?.meta?.prefersBorder !== false && styles.bordered)}>
-        <iframe
-          allow={APP_IFRAME_ALLOW}
-          ref={iframeRef}
-          // No `allow-same-origin`: the view runs on an opaque origin and can
-          // reach LobeHub only through the postMessage bridge.
-          sandbox="allow-scripts allow-forms"
-          srcDoc={srcDoc}
-          title={`${identifier} / ${apiName}`}
-          {...stylex.props(styles.iframe, styles.iframeHeight(`${height}px`))}
-        />
-      </div>
+      <Flexbox gap={8}>
+        <div {...stylex.props(resource?.meta?.prefersBorder !== false && styles.bordered)}>
+          <iframe
+            allow={APP_IFRAME_ALLOW}
+            ref={iframeRef}
+            // No `allow-same-origin`: the view runs on an opaque origin and can
+            // reach LobeHub only through the postMessage bridge.
+            sandbox="allow-scripts allow-forms"
+            srcDoc={srcDoc}
+            title={`${identifier} / ${apiName}`}
+            {...stylex.props(styles.iframe, styles.iframeHeight(`${height}px`))}
+          />
+        </div>
+        {waitingApprovals > 0 && (
+          <Flexbox horizontal align={'center'} gap={8} role={'status'}>
+            <Spin size={'small'} />
+            <Text fontSize={12} type={'secondary'}>
+              {t('mcpApp.waitingApproval')}
+            </Text>
+          </Flexbox>
+        )}
+      </Flexbox>
     );
   },
 );

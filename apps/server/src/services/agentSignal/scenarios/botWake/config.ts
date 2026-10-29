@@ -10,7 +10,8 @@ export const DEFAULT_WAKE_RULES: WakeRules = {
   classifier: { mode: 'enforce', threshold: 0.75 },
   denyChannels: [],
   // Off until the bot has duties: without the text there is nothing to judge a message against.
-  duties: { mode: 'enforce', threshold: 0.8 },
+  // The decision model scores plain feature requests 0.65-0.76, so 0.8 let almost none through.
+  duties: { mode: 'enforce', threshold: 0.65 },
   maxSilentWakes: 3,
   ownerPresenceSeconds: 120,
   scope: 'all',

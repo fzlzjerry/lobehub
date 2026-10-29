@@ -32,6 +32,7 @@ export type QueuedFollowUpRequest = Omit<
   | 'existingMessageIds'
   | 'includeFinalState'
   | 'parentMessageId'
+  | 'queuedSuccessor'
   | 'replacesOperationId'
   | 'resumeApproval'
   | 'resumeApprovals'
@@ -316,7 +317,9 @@ export const startQueuedFollowUp = async (
       {
         ...request,
         appContext: { ...request.appContext, threadId: scope.threadId, topicId: scope.topicId },
-        steer: true,
+        // A drained follow-up starts its own turn — it did not steer the run
+        // it waited behind, so the user message stays unmarked.
+        queuedSuccessor: true,
       },
     );
     log(

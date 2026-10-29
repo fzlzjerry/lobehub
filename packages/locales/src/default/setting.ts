@@ -1,4 +1,8 @@
 export default {
+  'systemAgent.channelRouting.title': 'Channel decision model',
+  'systemAgent.channelRouting.modelDesc':
+    'Choose which Agents reply to messages without @mentions. When off, all eligible Agents reply.',
+
   'chatPreference.assist.desc':
     'Personal preferences: they only apply to you, in your personal space and every workspace.',
   'chatPreference.assist.title': 'Chat Assist',
@@ -1187,6 +1191,10 @@ export default {
   'settingAgent.agentTools.tabUser': 'User Tools',
   'settingAgent.agentTools.tabWorkspace': 'Workspace Tools',
   'settingAgent.devicePolicy.noPublicDevice': 'No public devices',
+  'settingAgent.devicePolicy.privateDeviceFixed':
+    'A fixed environment can only use public workspace devices',
+  'settingAgent.devicePolicy.privateDevicePublicAgent':
+    'Private devices are for private agents only — other members cannot reach them',
   'settingAgent.devicePolicy.selectTarget': 'Select environment',
   'settingAgent.devicePolicy.title': 'Execution environment',
   'settingAgent.modelPolicy.fixedTip':
@@ -1678,6 +1686,8 @@ When I am ___, I need ___
     '[Skill Request] Summarize the skill you need in one sentence',
   'skillStore.wantMore.reachedEnd': "You've reached the end. Can't find what you need?",
   'skillView.connectors': 'Connectors',
+  'skillView.connectorsDesc':
+    'Connect the apps and tools your agents can use. Open one to see its account and tools.',
   'skillView.skills': 'Skills',
   'startConversation': 'Start Conversation',
   'storage.actions.transfer.button': 'Move to…',

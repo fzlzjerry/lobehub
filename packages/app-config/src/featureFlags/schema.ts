@@ -99,6 +99,8 @@ export const FeatureFlagsSchema = z.object({
    */
   channel: FeatureFlagValue.optional(),
 
+  topic_preview: FeatureFlagValue.optional(),
+
   // internal flag
   agent_onboarding: FeatureFlagValue.optional(),
   dev_dock: FeatureFlagValue.optional(),
@@ -181,6 +183,9 @@ export const DEFAULT_FEATURE_FLAGS: IFeatureFlags = {
   // Off until an admin publishes a user allowlist or flips it to true.
   channel: false,
 
+  // Off until the backend replaces the preview read; allowlist first.
+  topic_preview: false,
+
   agent_onboarding: isDev,
   dev_dock: isDev,
   auth_captcha: true,
@@ -219,6 +224,7 @@ export const mapFeatureFlagsEnvToState = (
     enableDashboard: evaluateFeatureFlag(config.dashboard, userId),
     enableMcpApp: evaluateFeatureFlag(config.mcp_app, userId),
     enableChannels: evaluateFeatureFlag(config.channel, userId),
+    enableTopicPreview: evaluateFeatureFlag(config.topic_preview, userId),
     showProvider: evaluateFeatureFlag(config.provider_settings, userId),
 
     showOpenAIApiKey: evaluateFeatureFlag(config.openai_api_key, userId),

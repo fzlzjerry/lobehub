@@ -44,7 +44,7 @@ describe('parseBotWakeSettings', () => {
     expect(parseBotWakeSettings({ [K.enabled]: true }).rules.duties).toEqual({
       mode: 'enforce',
       text: undefined,
-      threshold: 0.8,
+      threshold: 0.65,
     });
     expect(
       parseBotWakeSettings({ [K.duties]: '   ', [K.enabled]: true }).rules.duties.text,
@@ -67,7 +67,7 @@ describe('parseBotWakeSettings', () => {
     // A malformed value falls back to its default, keeping the rest.
     expect(
       parseBotWakeSettings({ [K.duties]: 42, [K.dutiesThreshold]: 3, [K.windowSeconds]: 60 }).rules,
-    ).toMatchObject({ duties: { text: undefined, threshold: 0.8 }, windowSeconds: 60 });
+    ).toMatchObject({ duties: { text: undefined, threshold: 0.65 }, windowSeconds: 60 });
     // A hand-written nested config spells them as an object.
     expect(
       parseBotWakeSettings({ botWake: { duties: { text: 'Triage bugs.', threshold: 0.9 } } }).rules
